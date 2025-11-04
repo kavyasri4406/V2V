@@ -1,7 +1,10 @@
-import type {Metadata} from 'next';
+'use client';
+
+import { useState, useEffect, useMemo, useRef } from 'react';
+import type { Metadata } from 'next';
 import './globals.css';
 import { Toaster } from '@/components/ui/toaster';
-import { FirebaseClientProvider } from '@/firebase';
+import { FirebaseClientProvider, useCollection, useFirestore, useMemoFirebase } from '@/firebase';
 import {
   Sidebar,
   SidebarContent,
@@ -14,19 +17,80 @@ import {
 import Header from '@/components/header';
 import Link from 'next/link';
 import { Home, Send, MessageSquareWarning, RadioTower, Settings } from 'lucide-react';
-
+import { collection, query, orderBy, limit, Timestamp } from 'firebase/firestore';
+import type { Alert } from '@/lib/types';
 
 const navigationItems: { name: string, icon: React.ElementType, href: string }[] = [
     { name: 'Home', icon: Home, href: '/' },
     { name: 'Broadcast Alert', icon: Send, href: '/send-alert'},
     { name: 'Detailed Alert', icon: MessageSquareWarning, href: '/detailed-alert'},
     { name: 'Live Alert Feed', icon: RadioTower, href: '/live-feed'},
-]
+];
 
-export const metadata: Metadata = {
-  title: 'V2V AlertCast',
-  description: 'Vehicle-to-Vehicle Real-time Alert System',
-};
+// We can't use the metadata export in a client component, so we'll manage the title directly.
+// You can create a Head component if you need more complex head management.
+
+function VoiceAlertManager() {
+  const firestore = useFirestore();
+  const [voiceEnabled, setVoiceEnabled] = useState(false);
+  const lastSpokenAlertId = useRef<string | null>(null);
+
+  const alertsQuery = useMemoFirebase(() => {
+    if (!firestore) return null;
+    return query(collection(firestore, 'alerts'), orderBy('timestamp', 'desc'), limit(1));
+  }, [firestore]);
+
+  const { data: alerts } = useCollection<Omit<Alert, 'id' | 'timestamp'> & { timestamp: Timestamp | number | null }>(alertsQuery);
+
+  const processedAlerts = useMemo(() => {
+    return alerts?.map(doc => {
+       const timestamp = doc.timestamp;
+       const timestampMs = timestamp instanceof Timestamp
+        ? timestamp.toMillis()
+        : typeof timestamp === 'number'
+        ? timestamp
+        : Date.now();
+
+      return {
+        ...doc,
+        id: doc.id, // ensure id is present
+        timestamp: timestampMs,
+      };
+    }).sort((a, b) => b.timestamp - a.timestamp) ?? [];
+  }, [alerts]);
+
+  useEffect(() => {
+    const checkVoiceSetting = () => {
+      if (typeof window !== 'undefined') {
+        const isEnabled = localStorage.getItem('voiceAlertsEnabled') === 'true';
+        setVoiceEnabled(isEnabled);
+      }
+    };
+
+    checkVoiceSetting(); // Initial check
+
+    window.addEventListener('storage', checkVoiceSetting);
+    return () => {
+        window.removeEventListener('storage', checkVoiceSetting);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (voiceEnabled && processedAlerts.length > 0) {
+      const latestAlert = processedAlerts[0];
+      if (latestAlert && latestAlert.id !== lastSpokenAlertId.current) {
+        if ('speechSynthesis' in window) {
+          const utterance = new SpeechSynthesisUtterance(`New alert from ${latestAlert.driver_name}. ${latestAlert.message}`);
+          window.speechSynthesis.speak(utterance);
+          lastSpokenAlertId.current = latestAlert.id;
+        }
+      }
+    }
+  }, [processedAlerts, voiceEnabled]);
+
+  return null; // This component doesn't render anything
+}
+
 
 export default function RootLayout({
   children,
@@ -36,12 +100,15 @@ export default function RootLayout({
   return (
     <html lang="en" className="light">
       <head>
+        <title>V2V AlertCast</title>
+        <meta name="description" content="Vehicle-to-Vehicle Real-time Alert System" />
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         <link href="https://fonts.googleapis.com/css2?family=PT+Sans:ital,wght@0,400;0,700;1,400;1,700&display=swap" rel="stylesheet" />
       </head>
       <body className="font-body antialiased">
         <FirebaseClientProvider>
+          <VoiceAlertManager />
           <SidebarProvider>
               <div className="flex min-h-screen flex-col">
               <Header />

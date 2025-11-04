@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo, useRef } from 'react';
+import { useMemo } from 'react';
 import { collection, query, orderBy, limit, Timestamp } from 'firebase/firestore';
 import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
 import type { Alert } from '@/lib/types';
@@ -10,8 +10,6 @@ import { Skeleton } from '@/components/ui/skeleton';
 
 export default function LiveAlertFeedPage() {
   const firestore = useFirestore();
-  const [voiceEnabled, setVoiceEnabled] = useState(false);
-  const lastSpokenAlertId = useRef<string | null>(null);
 
   const alertsQuery = useMemoFirebase(() => {
     if (!firestore) return null;
@@ -35,36 +33,6 @@ export default function LiveAlertFeedPage() {
       };
     }).sort((a, b) => b.timestamp - a.timestamp) ?? [];
   }, [alerts]);
-  
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-        const isEnabled = localStorage.getItem('voiceAlertsEnabled') === 'true';
-        setVoiceEnabled(isEnabled);
-
-        const handleStorageChange = () => {
-           const isEnabledUpdate = localStorage.getItem('voiceAlertsEnabled') === 'true';
-           setVoiceEnabled(isEnabledUpdate);
-        };
-
-        window.addEventListener('storage', handleStorageChange);
-        return () => {
-            window.removeEventListener('storage', handleStorageChange);
-        }
-    }
-  }, []);
-
-  useEffect(() => {
-    if (voiceEnabled && processedAlerts.length > 0) {
-      const latestAlert = processedAlerts[0];
-      if (latestAlert && latestAlert.id !== lastSpokenAlertId.current) {
-        if ('speechSynthesis' in window) {
-          const utterance = new SpeechSynthesisUtterance(`New alert from ${latestAlert.driver_name}. ${latestAlert.message}`);
-          window.speechSynthesis.speak(utterance);
-          lastSpokenAlertId.current = latestAlert.id;
-        }
-      }
-    }
-  }, [processedAlerts, voiceEnabled]);
 
   return (
     <div className="w-full max-w-4xl mx-auto">
