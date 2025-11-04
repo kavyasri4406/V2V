@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
@@ -30,8 +30,25 @@ const formSchema = z.object({
 
 export default function SendAlertPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [voiceEnabled, setVoiceEnabled] = useState(false);
   const { toast } = useToast();
   const firestore = useFirestore();
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const storedValue = localStorage.getItem('voiceAlertsEnabled') === 'true';
+      setVoiceEnabled(storedValue);
+
+      const handleStorageChange = () => {
+         const updatedValue = localStorage.getItem('voiceAlertsEnabled') === 'true';
+         setVoiceEnabled(updatedValue);
+      }
+      window.addEventListener('storage', handleStorageChange);
+      return () => {
+        window.removeEventListener('storage', handleStorageChange);
+      }
+    }
+  }, []);
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -65,6 +82,10 @@ export default function SendAlertPage() {
         toast({
           title: 'Alert sent successfully!',
         });
+        if (voiceEnabled && 'speechSynthesis' in window) {
+            const utterance = new SpeechSynthesisUtterance(values.message);
+            window.speechSynthesis.speak(utterance);
+        }
         form.reset();
       })
       .catch(() => {
