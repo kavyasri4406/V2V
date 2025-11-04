@@ -9,7 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Button } from '@/components/ui/button';
 import { AlertCard } from '@/components/alert-card';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Users, AlertTriangle } from 'lucide-react';
+import { Users, AlertTriangle, Send, RadioTower } from 'lucide-react';
 
 export default function Home() {
   const firestore = useFirestore();
@@ -66,25 +66,34 @@ export default function Home() {
   return (
       <div className="container mx-auto p-4 md:p-8">
         <div className="space-y-8">
-          <Card className="bg-card shadow-lg border-none animate-in fade-in-0 duration-500">
-            <CardHeader>
-              <CardTitle className="text-3xl font-bold tracking-tight">V2V Safety Network</CardTitle>
-              <CardDescription className="text-lg text-muted-foreground">
-                Real-time alerts from vehicles around you. Stay aware, stay connected.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Link href="/live-feed">
-                <Button size="lg" className="bg-primary hover:bg-primary/90 hover:shadow-lg hover:shadow-primary/30 transition-shadow duration-300">
-                  View Live Feed
-                </Button>
-              </Link>
-            </CardContent>
-          </Card>
+          
+          <div className="text-center p-8 bg-card rounded-lg shadow-lg border animate-in fade-in-0 duration-500">
+            <h1 className="text-4xl font-bold tracking-tight">Welcome to V2V AlertCast</h1>
+            <p className="text-lg text-muted-foreground mt-2">The real-time, vehicle-to-vehicle safety network.</p>
+            <p className="text-muted-foreground">Stay aware. Stay connected.</p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+            <Link href="/send-alert" className="transform transition-transform duration-300 hover:scale-105">
+                <Card className="h-full flex flex-col items-center justify-center text-center p-8 bg-primary/10 hover:bg-primary/20 cursor-pointer">
+                    <Send className="h-12 w-12 text-primary mb-4" />
+                    <CardTitle className="text-2xl">Broadcast an Alert</CardTitle>
+                    <CardDescription>Share a real-time update with the network.</CardDescription>
+                </Card>
+            </Link>
+            <Link href="/live-feed" className="transform transition-transform duration-300 hover:scale-105">
+                <Card className="h-full flex flex-col items-center justify-center text-center p-8 bg-accent/10 hover:bg-accent/20 cursor-pointer">
+                    <RadioTower className="h-12 w-12 text-accent mb-4" />
+                    <CardTitle className="text-2xl">View Live Feed</CardTitle>
+                    <CardDescription>See all active alerts from nearby drivers.</CardDescription>
+                </Card>
+            </Link>
+          </div>
+
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
             <div className="lg:col-span-2 space-y-8">
-                <Card className="animate-in fade-in-0 delay-150 duration-500 flex-1">
+                <Card className="animate-in fade-in-0 delay-150 duration-500">
                   <CardHeader>
                     <CardTitle>Latest Alert</CardTitle>
                     <CardDescription>The most recent broadcast on the network.</CardDescription>
@@ -108,7 +117,7 @@ export default function Home() {
             </div>
             
             <div className="space-y-8">
-                <Card className="animate-in fade-in-0 delay-300 duration-500 flex-1">
+                <Card className="animate-in fade-in-0 delay-300 duration-500">
                     <CardHeader>
                         <CardTitle>Network Overview</CardTitle>
                     </CardHeader>
