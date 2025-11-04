@@ -2,23 +2,22 @@
  * @fileoverview Firestore Security Rules for the Alert System.
  *
  * Core Philosophy:
- * This ruleset provides public read access to alerts while restricting write access.
- * It assumes that all alerts are global and publicly accessible.
+ * This ruleset provides public read access to alerts while restricting write access
+ * to authenticated users (including anonymous ones). This prevents unauthenticated
+ * clients from writing to the database.
  *
  * Data Structure:
  * All alerts are stored in a top-level collection called `/alerts/{alertId}`.
- * Each alert document contains an `id`, a `message`, and a `timestamp`.
+ * Each alert document contains an `id`, a `message`, a `type`, and a `timestamp`.
  *
  * Key Security Decisions:
- * - Public Read:  Alerts are intended to be publicly visible, so read access is open.
- * - Restricted Write: To prevent abuse, direct client-side writes (create, update, delete) are forbidden.
- *   Instead, a trusted backend environment (e.g., Cloud Functions) should handle alert creation and management.
- * - No User-Specific Data: The absence of user-related fields simplifies the rules and avoids complex authorization logic.
- * - Rate Limiting and Moderation: While not directly implemented in these rules, rate limiting and content moderation
- *   are essential considerations for a production system and should be handled in backend logic.
+ * - Public Read: Alerts are intended to be publicly visible, so read access is open.
+ * - Authenticated Write: To prevent abuse, only authenticated users (including anonymous users)
+ *   can create alerts. Direct client-side updates and deletes are forbidden.
+ * - Data Validation: Ensures that the created data has the correct fields and types.
  *
  * Denormalization for Authorization:
- *   Not applicable, as there is no authorization requirement.
+ *   Not applicable, as there is no complex user-based authorization.
  *
  * Structural Segregation:
  *   Not applicable, as all alerts are stored in a single, public collection.
@@ -28,16 +27,22 @@ service cloud.firestore {
   match /databases/{database}/documents {
 
     /**
-     * @description Grants public read access to alerts and restricts write access.
+     * @description Grants public read and authenticated write access to alerts.
      * @path /alerts/{alertId}
      * @allow (get, list): Any user can read alerts.
-     * @deny (create, update, delete): No client-side writes allowed.
-     * @principle Allows public read access but restricts write access to a trusted environment.
+     * @allow (create): Any authenticated user can create an alert.
+     * @deny (update, delete): No client-side updates or deletes allowed.
      */
     match /alerts/{alertId} {
       allow get: if true;
       allow list: if true;
-      allow create: if false;
+      allow create: if request.auth != null &&
+                      request.resource.data.message is string &&
+                      request.resource.data.message.size() >= 5 &&
+                      request.resource.data.message.size() <= 140 &&
+                      request.resource.data.type is string &&
+                      request.resource.data.type in ['Traffic', 'Weather', 'Accident', 'Road Hazard'] &&
+                      request.resource.data.timestamp == request.time;
       allow update: if false;
       allow delete: if false;
     }
