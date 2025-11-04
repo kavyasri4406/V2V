@@ -1,11 +1,8 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    match /alerts/{document=**} {
-      allow read: if true;
-    }
-    
     match /alerts/{alertId} {
+      allow read: if true;
       allow create: if request.auth != null;
     }
     
