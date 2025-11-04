@@ -91,7 +91,6 @@ export default function SendAlertPage() {
       <Card>
         <CardHeader>
           <CardTitle>Broadcast an Alert</CardTitle>
-          <CardDescription>Fill out the form below to send an alert to other vehicles on the network.</CardDescription>
         </CardHeader>
         <CardContent>
           <Form {...form}>
