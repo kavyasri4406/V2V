@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 
@@ -101,7 +101,7 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
                         <div className="flex items-center gap-2 p-2">
                             <Car className="w-6 h-6 text-primary" />
                             <span className="text-lg font-semibold group-data-[collapsible=icon]:hidden">
-                                V2V AlertCast
+                                V2V
                             </span>
                         </div>
                     </SidebarHeader>
