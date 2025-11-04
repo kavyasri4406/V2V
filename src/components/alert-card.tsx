@@ -19,15 +19,11 @@ export function AlertCard({ alert }: AlertCardProps) {
         <div className="flex-1 space-y-1">
           <div className="flex justify-between items-center">
             <p className="font-semibold text-card-foreground">{alert.driver_name} <span className="font-normal text-muted-foreground">({alert.sender_vehicle})</span></p>
-            {alert.timestamp ? (
-                <p className="text-xs text-muted-foreground">
-                {formatDistanceToNow(new Date(alert.timestamp), {
-                    addSuffix: true,
-                })}
-                </p>
-            ) : (
-                <p className="text-xs text-muted-foreground">Just now</p>
-            )}
+            <p className="text-xs text-muted-foreground">
+              {formatDistanceToNow(new Date(alert.timestamp), {
+                  addSuffix: true,
+              })}
+            </p>
           </div>
           <p className="text-sm text-muted-foreground">{alert.message}</p>
         </div>

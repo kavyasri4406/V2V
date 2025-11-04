@@ -16,7 +16,7 @@ import {
   FormMessage,
 } from '@/components/ui/form';
 import { Textarea } from '@/components/ui/textarea';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import { Send, Loader2 } from 'lucide-react';
 import type { UserProfile } from '@/lib/types';
@@ -116,6 +116,7 @@ export default function SendAlertPage() {
         <Card>
           <CardHeader>
             <CardTitle>Broadcast an Alert</CardTitle>
+            <CardDescription>Describe the situation in detail.</CardDescription>
           </CardHeader>
           <CardContent>
             <Form {...form}>
@@ -128,7 +129,8 @@ export default function SendAlertPage() {
                       <FormLabel>Alert Message</FormLabel>
                       <FormControl>
                         <Textarea
-                          placeholder="Describe the situation..."
+                          placeholder="e.g., Standstill traffic on I-5 North due to an accident near the bridge."
+                          className="min-h-[120px] resize-y"
                           {...field}
                         />
                       </FormControl>
@@ -138,13 +140,11 @@ export default function SendAlertPage() {
                 />
                 <Button type="submit" disabled={isSubmitting} className="w-full">
                   {isSubmitting ? (
-                    <Loader2 className="animate-spin" />
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                   ) : (
-                    <>
-                      <Send />
-                      Broadcast
-                    </>
+                    <Send className="mr-2 h-4 w-4" />
                   )}
+                  Broadcast Alert
                 </Button>
               </form>
             </Form>

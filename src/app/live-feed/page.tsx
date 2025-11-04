@@ -42,12 +42,13 @@ export default function LiveAlertFeedPage() {
 
   const processedAlerts = useMemo(() => {
     if (!alerts) return [];
-    return alerts?.map(doc => {
+    return alerts.map(doc => {
        const timestamp = doc.timestamp;
        const timestampMs = timestamp instanceof Timestamp ? timestamp.toMillis() : Date.now();
 
       return {
         ...doc,
+        id: doc.id,
         timestamp: timestampMs,
       };
     }).sort((a, b) => b.timestamp - a.timestamp);
@@ -129,7 +130,7 @@ export default function LiveAlertFeedPage() {
                   <Tooltip>
                     <TooltipTrigger asChild>
                       <AlertDialogTrigger asChild>
-                        <Button variant="destructive" size="icon" disabled={isLoading || isDeleting}>
+                        <Button variant="destructive" size="icon" disabled={isLoading || isDeleting || (processedAlerts.length === 0 && !isLoading)}>
                           {isDeleting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
                           <span className="sr-only">Clear All Alerts</span>
                         </Button>
