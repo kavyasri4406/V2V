@@ -23,6 +23,7 @@ const navigationItems: { name: string, icon: React.ElementType, href: string }[]
     { name: 'Send', icon: Send, href: '/send-alert'},
     { name: 'Quick Alert', icon: MessageSquareWarning, href: '/detailed-alert'},
     { name: 'Live Alert Feed', icon: RadioTower, href: '/live-feed'},
+    { name: 'Settings', icon: Settings, href: '/settings' },
 ];
 
 function VoiceAlertManager() {
@@ -113,18 +114,6 @@ export default function MainLayout({
                               </Link>
                           </SidebarMenuItem>
                           ))}
-                      </SidebarMenu>
-                      </SidebarGroup>
-                      <SidebarGroup>
-                      <SidebarMenu>
-                          <SidebarMenuItem>
-                              <Link href="/settings">
-                              <SidebarMenuButton tooltip="Settings">
-                                  <Settings />
-                                  <span className="group-data-[collapsible=icon]:hidden">Settings</span>
-                              </SidebarMenuButton>
-                              </Link>
-                          </SidebarMenuItem>
                       </SidebarMenu>
                       </SidebarGroup>
                   </SidebarContent>
