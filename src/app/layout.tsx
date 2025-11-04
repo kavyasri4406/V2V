@@ -15,17 +15,18 @@ import {
 } from '@/components/ui/sidebar';
 import Header from '@/components/header';
 import Link from 'next/link';
-import { Home, TrafficCone, CloudSun, Car, TriangleAlert, ShieldAlert } from 'lucide-react';
+import { Home, TrafficCone, CloudSun, Car, TriangleAlert, ShieldAlert, Settings } from 'lucide-react';
 import type { AlertType } from '@/lib/types';
 
 
-const alertTypes: { name: AlertType | 'Home', icon: React.ElementType, href: string }[] = [
+const alertTypes: { name: string, icon: React.ElementType, href: string }[] = [
     { name: 'Home', icon: Home, href: '/' },
     { name: 'Traffic', icon: TrafficCone, href: '/alerts/traffic' },
     { name: 'Weather', icon: CloudSun, href: '/alerts/weather' },
     { name: 'Accident', icon: Car, href: '/alerts/accident' },
     { name: 'Road Hazard', icon: TriangleAlert, href: '/alerts/road-hazard' },
     { name: 'Collision', icon: ShieldAlert, href: '/alerts/collision' },
+    { name: 'Settings', icon: Settings, href: '/settings'}
 ]
 
 

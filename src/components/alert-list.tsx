@@ -12,10 +12,10 @@ import { BellRing, BellOff } from "lucide-react";
 
 type AlertListProps = {
   filterByType?: AlertType;
+  voiceEnabled?: boolean;
 };
 
-export default function AlertList({ filterByType }: AlertListProps) {
-  const [voiceEnabled, setVoiceEnabled] = useState(false);
+export default function AlertList({ filterByType, voiceEnabled }: AlertListProps) {
   const firestore = useFirestore();
 
   const alertsQuery = useMemoFirebase(
@@ -66,19 +66,6 @@ export default function AlertList({ filterByType }: AlertListProps) {
     <Card className="h-full">
       <CardHeader className="flex flex-row items-center justify-between">
         <CardTitle>{filterByType ? `${filterByType} Alerts` : 'Live Alert Feed'}</CardTitle>
-        <div className="flex items-center space-x-2">
-          {voiceEnabled ? (
-            <BellRing className="text-primary" />
-          ) : (
-            <BellOff className="text-muted-foreground" />
-          )}
-          <Label htmlFor="voice-alerts">Voice Alerts</Label>
-          <Switch
-            id="voice-alerts"
-            checked={voiceEnabled}
-            onCheckedChange={setVoiceEnabled}
-          />
-        </div>
       </CardHeader>
       <CardContent>
         <div className="space-y-4">
