@@ -1,15 +1,15 @@
 'use client';
 
-import { useMemo } from 'react';
 import Link from 'next/link';
 import { collection, query, orderBy, limit, Timestamp } from 'firebase/firestore';
 import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
 import type { Alert } from '@/lib/types';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
 import { AlertCard } from '@/components/alert-card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Users, AlertTriangle, Send, RadioTower } from 'lucide-react';
+import { useMemo } from 'react';
+
 
 export default function Home() {
   const firestore = useFirestore();
@@ -24,7 +24,7 @@ export default function Home() {
     return query(collection(firestore, 'alerts'));
   }, [firestore]);
 
-  const { data: latestAlertData, isLoading: isLatestLoading } = useCollection<Omit<Alert, 'id' | 'timestamp'> & { timestamp: Timestamp | null }>(latestAlertQuery);
+  const { data: latestAlertData, isLoading: isLatestLoading } = useCollection<Omit<Alert, 'id' | 'timestamp'> & { timestamp: Timestamp | number | null }>(latestAlertQuery);
   const { data: allAlertsData, isLoading: areAllLoading } = useCollection(allAlertsQuery);
 
   const latestAlert = useMemo(() => {

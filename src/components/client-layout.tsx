@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 
@@ -8,15 +8,15 @@ import { collection, query, orderBy, limit, Timestamp } from 'firebase/firestore
 import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
 import type { Alert } from '@/lib/types';
 import {
-  SidebarProvider,
-  Sidebar,
-  SidebarHeader,
-  SidebarContent,
-  SidebarMenu,
-  SidebarMenuItem,
-  SidebarMenuButton,
-  SidebarFooter,
-  SidebarTrigger,
+    SidebarProvider,
+    Sidebar,
+    SidebarHeader,
+    SidebarContent,
+    SidebarMenu,
+    SidebarMenuItem,
+    SidebarMenuButton,
+    SidebarFooter,
+    SidebarTrigger,
 } from '@/components/ui/sidebar';
 import Header from '@/components/header';
 import {
@@ -112,7 +112,7 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
                                 <Link href={item.href} className="w-full">
                                     <SidebarMenuButton tooltip={item.name} isActive={pathname === item.href}>
                                         <item.icon />
-                                        <span>{item.name}</span>
+                                        <span className="group-data-[collapsible=icon]:hidden">{item.name}</span>
                                     </SidebarMenuButton>
                                 </Link>
                                 </SidebarMenuItem>
