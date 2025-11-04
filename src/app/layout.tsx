@@ -13,13 +13,20 @@ import {
 } from '@/components/ui/sidebar';
 import Header from '@/components/header';
 import Link from 'next/link';
-import { Home, Settings, Send } from 'lucide-react';
+import { Home, Settings, Send, TrafficCone, Car, ShieldAlert, TriangleAlert } from 'lucide-react';
 
 
 const navigationItems: { name: string, icon: React.ElementType, href: string }[] = [
     { name: 'Home', icon: Home, href: '/' },
     { name: 'Send Alert', icon: Send, href: '/send-alert'},
 ]
+
+const alertTypeLinks = [
+  { name: 'Traffic', icon: TrafficCone, href: '/alerts/traffic' },
+  { name: 'Accident', icon: Car, href: '/alerts/accident' },
+  { name: 'Collision', icon: ShieldAlert, href: '/alerts/collision' },
+  { name: 'Road Hazard', icon: TriangleAlert, href: '/alerts/road-hazard' },
+];
 
 export const metadata: Metadata = {
   title: 'V2V AlertCast',
@@ -49,6 +56,20 @@ export default function RootLayout({
                       <SidebarGroup>
                         <SidebarMenu>
                           {navigationItems.map(item => (
+                            <SidebarMenuItem key={item.name}>
+                              <Link href={item.href}>
+                                <SidebarMenuButton tooltip={item.name}>
+                                  <item.icon />
+                                  <span>{item.name}</span>
+                                </SidebarMenuButton>
+                              </Link>
+                            </SidebarMenuItem>
+                          ))}
+                        </SidebarMenu>
+                      </SidebarGroup>
+                      <SidebarGroup>
+                         <SidebarMenu>
+                          {alertTypeLinks.map(item => (
                             <SidebarMenuItem key={item.name}>
                               <Link href={item.href}>
                                 <SidebarMenuButton tooltip={item.name}>

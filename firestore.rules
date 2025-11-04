@@ -2,14 +2,11 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     match /alerts/{alertId} {
-      // Allow reading single documents and the entire collection by anyone
       allow read: if true;
-      // Allow creating documents only for authenticated users
       allow create: if request.auth != null;
     }
     
     match /sent-alerts/{alertId} {
-        // Allow creating documents only for authenticated users
         allow create: if request.auth != null;
     }
   }
