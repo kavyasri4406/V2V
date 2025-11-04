@@ -14,51 +14,43 @@ import { useMemo } from 'react';
 export default function Home() {
   const firestore = useFirestore();
 
-  const latestAlertQuery = useMemoFirebase(() => {
+  const alertsQuery = useMemoFirebase(() => {
     if (!firestore) return null;
-    return query(collection(firestore, 'alerts'), orderBy('timestamp', 'desc'), limit(1));
+    return query(collection(firestore, 'alerts'), orderBy('timestamp', 'desc'), limit(50));
   }, [firestore]);
 
-  const allAlertsQuery = useMemoFirebase(() => {
-    if (!firestore) return null;
-    return query(collection(firestore, 'alerts'));
-  }, [firestore]);
+  const { data: alerts, isLoading } = useCollection<Omit<Alert, 'id' | 'timestamp'> & { timestamp: Timestamp | null }>(alertsQuery);
 
-  const { data: latestAlertData, isLoading: isLatestLoading } = useCollection<Omit<Alert, 'id' | 'timestamp'> & { timestamp: Timestamp | null }>(latestAlertQuery);
-  const { data: allAlertsData, isLoading: areAllLoading } = useCollection(allAlertsQuery);
+  const processedAlerts = useMemo(() => {
+    if (!alerts) return [];
+    return alerts.map(alert => {
+      const timestamp = alert.timestamp;
+      const timestampMs = timestamp instanceof Timestamp
+        ? timestamp.toMillis()
+        : (timestamp || Date.now());
+      return { ...alert, timestamp: timestampMs };
+    }).sort((a, b) => b.timestamp - a.timestamp);
+  }, [alerts]);
 
   const latestAlert = useMemo(() => {
-    if (!latestAlertData || latestAlertData.length === 0) return null;
-    const alert = latestAlertData[0];
-    const timestamp = alert.timestamp;
-
-    // Handle both Firestore Timestamp and number (from Date.now())
-    const timestampMs = timestamp instanceof Timestamp
-      ? timestamp.toMillis()
-      : Date.now();
-
-    return {
-      ...alert,
-      timestamp: timestampMs,
-    };
-  }, [latestAlertData]);
+    return processedAlerts.length > 0 ? processedAlerts[0] : null;
+  }, [processedAlerts]);
 
   const totalAlertsToday = useMemo(() => {
-    if (!allAlertsData) return 0;
+    if (!alerts) return 0;
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    return allAlertsData.filter(doc => {
-      if (!doc.timestamp) return false;
-      const alertDate = doc.timestamp instanceof Timestamp ? doc.timestamp.toDate() : new Date();
-      return alertDate >= today;
+    return processedAlerts.filter(alert => {
+      if (!alert.timestamp) return false;
+      return alert.timestamp >= today.getTime();
     }).length;
-  }, [allAlertsData]);
+  }, [alerts, processedAlerts]);
 
   const activeDrivers = useMemo(() => {
-    if (!allAlertsData) return 0;
-    const uniqueDrivers = new Set(allAlertsData.map(doc => doc.driver_name));
+    if (!alerts) return 0;
+    const uniqueDrivers = new Set(alerts.map(doc => doc.driver_name));
     return uniqueDrivers.size;
-  }, [allAlertsData]);
+  }, [alerts]);
 
 
   return (
@@ -97,7 +89,7 @@ export default function Home() {
                     <CardDescription>The most recent broadcast on the network.</CardDescription>
                   </CardHeader>
                   <CardContent>
-                    {isLatestLoading ? (
+                    {isLoading ? (
                       <div className="flex items-center space-x-4">
                           <Skeleton className="h-12 w-12 rounded-full" />
                           <div className="space-y-2">
@@ -125,7 +117,7 @@ export default function Home() {
                             <AlertTriangle className="h-6 w-6" />
                         </div>
                         <div>
-                            <div className="text-2xl font-bold">{areAllLoading ? <Skeleton className="h-6 w-12" /> : totalAlertsToday}</div>
+                            <div className="text-2xl font-bold">{isLoading ? <Skeleton className="h-6 w-12" /> : totalAlertsToday}</div>
                             <div className="text-sm text-muted-foreground">Alerts Today</div>
                         </div>
                         </div>
@@ -134,7 +126,7 @@ export default function Home() {
                             <Users className="h-6 w-6" />
                         </div>
                         <div>
-                            <div className="text-2xl font-bold">{areAllLoading ? <Skeleton className="h-6 w-12" /> : activeDrivers}</div>
+                            <div className="text-2xl font-bold">{isLoading ? <Skeleton className="h-6 w-12" /> : activeDrivers}</div>
                             <div className="text-sm text-muted-foreground">Active Drivers</div>
                         </div>
                         </div>
