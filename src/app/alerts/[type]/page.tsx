@@ -14,7 +14,7 @@ type AlertTypePageProps = {
 export default function AlertTypePage({ params: paramsProp }: AlertTypePageProps) {
   // The 'params' prop can be a promise in some Next.js contexts.
   // We use React.use() to unwrap it, which works for both promises and direct objects.
-  const params = use(Promise.resolve(paramsProp));
+  const params = use(paramsProp);
 
   // Decode and capitalize the alert type from the URL
   const alertType = useMemo(() => {
