@@ -62,18 +62,17 @@ export default function DetailedAlertPage() {
 
 
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const storedValue = localStorage.getItem('voiceAlertsEnabled') === 'true';
-      setVoiceEnabled(storedValue);
+    // This effect runs only on the client, avoiding hydration errors
+    const storedValue = localStorage.getItem('voiceAlertsEnabled') === 'true';
+    setVoiceEnabled(storedValue);
 
-      const handleStorageChange = () => {
-         const updatedValue = localStorage.getItem('voiceAlertsEnabled') === 'true';
-         setVoiceEnabled(updatedValue);
-      }
-      window.addEventListener('storage', handleStorageChange);
-      return () => {
-        window.removeEventListener('storage', handleStorageChange);
-      }
+    const handleStorageChange = () => {
+        const updatedValue = localStorage.getItem('voiceAlertsEnabled') === 'true';
+        setVoiceEnabled(updatedValue);
+    }
+    window.addEventListener('storage', handleStorageChange);
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
     }
   }, []);
 
@@ -116,11 +115,7 @@ export default function DetailedAlertPage() {
           requestResourceData: newAlert,
         });
         errorEmitter.emit('permission-error', permissionError);
-        toast({
-          variant: 'destructive',
-          title: 'Error',
-          description: 'Failed to broadcast alert. Please try again.',
-        });
+        // The global error handler will show the error, no need for a toast here
       })
       .finally(() => {
         setSubmittingType(null);

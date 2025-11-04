@@ -41,17 +41,16 @@ export default function LiveAlertFeedPage() {
   const { data: alerts, isLoading } = useCollection<Omit<Alert, 'id' | 'timestamp'> & { timestamp: Timestamp | null }>(alertsQuery);
 
   const processedAlerts = useMemo(() => {
+    if (!alerts) return [];
     return alerts?.map(doc => {
        const timestamp = doc.timestamp;
-       const timestampMs = timestamp instanceof Timestamp
-        ? timestamp.toMillis()
-        : Date.now();
+       const timestampMs = timestamp instanceof Timestamp ? timestamp.toMillis() : Date.now();
 
       return {
         ...doc,
         timestamp: timestampMs,
       };
-    }).sort((a, b) => b.timestamp - a.timestamp) ?? [];
+    }).sort((a, b) => b.timestamp - a.timestamp);
   }, [alerts]);
 
   const handleClearAlerts = async () => {
@@ -66,17 +65,15 @@ export default function LiveAlertFeedPage() {
     setIsDeleting(true);
 
     const alertsRef = collection(firestore, 'alerts');
+    
+    // In a real app, you'd want to paginate this for very large collections.
+    // For this app, fetching all and batch deleting is okay.
     const querySnapshot = await getDocs(alertsRef).catch((error) => {
         const permissionError = new FirestorePermissionError({
             path: alertsRef.path,
             operation: 'list',
         });
         errorEmitter.emit('permission-error', permissionError);
-        toast({
-            variant: 'destructive',
-            title: 'Permission Error',
-            description: 'Failed to fetch alerts to delete.',
-        });
         setIsDeleting(false);
         return null;
     });
@@ -88,6 +85,7 @@ export default function LiveAlertFeedPage() {
     if (querySnapshot.empty) {
       toast({
         title: 'No alerts to clear',
+        description: 'The feed is already empty.'
       });
       setIsDeleting(false);
       return;
@@ -106,19 +104,12 @@ export default function LiveAlertFeedPage() {
         });
       })
       .catch(() => {
-        // Since batch deletes don't give individual document context,
-        // we signal the operation on the collection path.
         const permissionError = new FirestorePermissionError({
             path: alertsRef.path,
             operation: 'delete',
         });
         errorEmitter.emit('permission-error', permissionError);
-
-        toast({
-          variant: 'destructive',
-          title: 'Error',
-          description: 'Failed to clear alerts. Please check permissions and try again.',
-        });
+        // Global handler will show the error
       })
       .finally(() => {
         setIsDeleting(false);
@@ -138,7 +129,7 @@ export default function LiveAlertFeedPage() {
                   <Tooltip>
                     <TooltipTrigger asChild>
                       <AlertDialogTrigger asChild>
-                        <Button variant="destructive" size="icon" disabled={isLoading || processedAlerts.length === 0 || isDeleting}>
+                        <Button variant="destructive" size="icon" disabled={isLoading || isDeleting}>
                           {isDeleting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
                           <span className="sr-only">Clear All Alerts</span>
                         </Button>

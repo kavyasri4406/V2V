@@ -25,11 +25,10 @@ export default function Home() {
     if (!alerts) return [];
     return alerts.map(alert => {
       const timestamp = alert.timestamp;
-      const timestampMs = timestamp instanceof Timestamp
-        ? timestamp.toMillis()
-        : (timestamp || Date.now());
+      const timestampMs = timestamp instanceof Timestamp ? timestamp.toMillis() : 0;
       return { ...alert, timestamp: timestampMs };
-    }).sort((a, b) => b.timestamp - a.timestamp);
+    }).filter(alert => alert.timestamp > 0) // Filter out alerts with invalid timestamps
+    .sort((a, b) => b.timestamp - a.timestamp);
   }, [alerts]);
 
   const latestAlert = useMemo(() => {
@@ -40,11 +39,10 @@ export default function Home() {
     if (!alerts) return 0;
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    return processedAlerts.filter(alert => {
-      if (!alert.timestamp) return false;
-      return alert.timestamp >= today.getTime();
-    }).length;
-  }, [alerts, processedAlerts]);
+    const todayTimestamp = today.getTime();
+
+    return processedAlerts.filter(alert => alert.timestamp >= todayTimestamp).length;
+  }, [processedAlerts]);
 
   const activeDrivers = useMemo(() => {
     if (!alerts) return 0;

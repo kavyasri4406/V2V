@@ -16,7 +16,7 @@ import {
   FormMessage,
 } from '@/components/ui/form';
 import { Textarea } from '@/components/ui/textarea';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import { Send, Loader2 } from 'lucide-react';
 import type { UserProfile } from '@/lib/types';
@@ -44,18 +44,17 @@ export default function SendAlertPage() {
   const { data: userProfile } = useDoc<UserProfile>(userProfileRef);
 
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const storedValue = localStorage.getItem('voiceAlertsEnabled') === 'true';
-      setVoiceEnabled(storedValue);
+    // This effect runs only on the client, avoiding hydration errors
+    const storedValue = localStorage.getItem('voiceAlertsEnabled') === 'true';
+    setVoiceEnabled(storedValue);
 
-      const handleStorageChange = () => {
-         const updatedValue = localStorage.getItem('voiceAlertsEnabled') === 'true';
-         setVoiceEnabled(updatedValue);
-      }
-      window.addEventListener('storage', handleStorageChange);
-      return () => {
-        window.removeEventListener('storage', handleStorageChange);
-      }
+    const handleStorageChange = () => {
+        const updatedValue = localStorage.getItem('voiceAlertsEnabled') === 'true';
+        setVoiceEnabled(updatedValue);
+    }
+    window.addEventListener('storage', handleStorageChange);
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
     }
   }, []);
 
@@ -105,12 +104,7 @@ export default function SendAlertPage() {
           requestResourceData: newAlert,
         });
         errorEmitter.emit('permission-error', permissionError);
-
-        toast({
-          variant: 'destructive',
-          title: 'Error',
-          description: 'Failed to send alert. Please check permissions and try again.',
-        });
+        // The global error handler will show the error, no need for a toast here
       })
       .finally(() => {
         setIsSubmitting(false);

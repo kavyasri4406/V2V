@@ -1,14 +1,15 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useMemo, useEffect } from "react";
 import { collection, query, where, orderBy, limit, Timestamp } from "firebase/firestore";
 import { useCollection, useFirestore, useMemoFirebase } from "@/firebase";
-import type { Alert, AlertType } from "@/lib/types";
+import type { Alert } from "@/lib/types";
 import { AlertCard } from "./alert-card";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
+import { Skeleton } from "./ui/skeleton";
 
 type AlertListProps = {
-  filterByType?: AlertType;
+  filterByType?: string;
   voiceEnabled?: boolean;
 };
 
@@ -35,10 +36,12 @@ export default function AlertList({ filterByType, voiceEnabled }: AlertListProps
   const { data: alerts, isLoading } = useCollection<Omit<Alert, "id" | "timestamp"> & { timestamp: Timestamp | null }>(alertsQuery);
 
   const processedAlerts = useMemo(() => {
+    if (!alerts) return [];
     return alerts?.map(doc => ({
       ...doc,
-      timestamp: doc.timestamp ? doc.timestamp.toDate().getTime() : Date.now(),
-    })).sort((a, b) => b.timestamp - a.timestamp) ?? [];
+      timestamp: doc.timestamp instanceof Timestamp ? doc.timestamp.toMillis() : 0,
+    })).filter(alert => alert.timestamp > 0)
+    .sort((a, b) => b.timestamp - a.timestamp) ?? [];
   }, [alerts]);
 
   useEffect(() => {
@@ -49,9 +52,9 @@ export default function AlertList({ filterByType, voiceEnabled }: AlertListProps
       window.speechSynthesis
     ) {
       const latestAlert = processedAlerts[0];
-      if (latestAlert) {
+      if (latestAlert?.message) {
         const utterance = new SpeechSynthesisUtterance(
-          `Alert: ${latestAlert.type}. ${latestAlert.message}`
+          `Alert: ${latestAlert.message}`
         );
         window.speechSynthesis.speak(utterance);
       }
@@ -67,9 +70,15 @@ export default function AlertList({ filterByType, voiceEnabled }: AlertListProps
       <CardContent>
         <div className="space-y-4">
           {isLoading ? (
-            <p className="text-muted-foreground text-center py-8">
-              Listening for alerts...
-            </p>
+             Array.from({ length: 3 }).map((_, i) => (
+                <div className="flex items-center space-x-4 p-4" key={i}>
+                    <Skeleton className="h-12 w-12 rounded-full" />
+                    <div className="space-y-2">
+                    <Skeleton className="h-4 w-[250px]" />
+                    <Skeleton className="h-4 w-[200px]" />
+                    </div>
+                </div>
+            ))
           ) : processedAlerts.length > 0 ? (
             processedAlerts.map((alert) => <AlertCard key={alert.id} alert={alert} />)
           ) : (
