@@ -167,9 +167,6 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
                                 </SidebarMenuItem>
                             )}
                         </SidebarMenu>
-                        <p className="text-xs text-muted-foreground p-2 group-data-[collapsible=icon]:hidden">
-                            &copy; {new Date().getFullYear()} V2V AlertCast
-                        </p>
                     </SidebarFooter>
                 </Sidebar>
                 <div className="flex flex-col flex-1">
