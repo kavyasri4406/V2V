@@ -52,17 +52,20 @@ export default function AlertList({ filterByType }: AlertListProps) {
       window.speechSynthesis
     ) {
       const latestAlert = processedAlerts[0];
-      const utterance = new SpeechSynthesisUtterance(
-        `Alert: ${latestAlert.type}. ${latestAlert.message}`
-      );
-      window.speechSynthesis.speak(utterance);
+      if (latestAlert) {
+        const utterance = new SpeechSynthesisUtterance(
+          `Alert: ${latestAlert.type}. ${latestAlert.message}`
+        );
+        window.speechSynthesis.speak(utterance);
+      }
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [processedAlerts, voiceEnabled]);
 
   return (
     <Card className="h-full">
       <CardHeader className="flex flex-row items-center justify-between">
-        <CardTitle>{filterByType ? 'Filtered Feed' : 'Live Alert Feed'}</CardTitle>
+        <CardTitle>{filterByType ? `${filterByType} Alerts` : 'Live Alert Feed'}</CardTitle>
         <div className="flex items-center space-x-2">
           {voiceEnabled ? (
             <BellRing className="text-primary" />
