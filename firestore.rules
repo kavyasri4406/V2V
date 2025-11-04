@@ -29,12 +29,12 @@ service cloud.firestore {
     /**
      * @description Grants public read and authenticated write access to alerts.
      * @path /alerts/{alertId}
-     * @allow (get, list): Any user (including unauthenticated) can read alerts.
+     * @allow (read): Any user (including unauthenticated) can read alerts.
      * @allow (create): Any authenticated user can create an alert.
      * @deny (update, delete): No client-side updates or deletes allowed.
      */
     match /alerts/{alertId} {
-      allow get, list: if true;
+      allow read: if true;
       allow create: if request.auth != null &&
                       request.resource.data.message is string &&
                       request.resource.data.message.size() >= 5 &&
