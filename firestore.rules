@@ -3,12 +3,11 @@ service cloud.firestore {
   match /databases/{database}/documents {
     // Rules for the 'alerts' collection
     match /alerts/{alertId} {
-      
-      // ANYONE can read a single alert document.
-      allow get: if true;
+      // ANYONE can read ('get') a single alert document or list the entire collection.
+      allow read: if true;
 
-      // ONLY an authenticated user can create an alert.
-      // Data must be valid.
+      // ONLY an authenticated user can create ('write') an alert.
+      // Data must be valid according to the specified constraints.
       allow create: if request.auth != null &&
                       request.resource.data.message is string &&
                       request.resource.data.message.size() >= 5 &&
@@ -19,9 +18,6 @@ service cloud.firestore {
 
       // NO ONE can update or delete alerts from the client.
       allow update, delete: if false;
-
-      // ANYONE can list the alerts collection to see the feed.
-      allow list: if true;
     }
   }
 }
