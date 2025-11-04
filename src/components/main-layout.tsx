@@ -108,7 +108,7 @@ export default function MainLayout({
                               <Link href={item.href}>
                               <SidebarMenuButton tooltip={item.name}>
                                   <item.icon />
-                                  <span className="group-data-[collapsible=icon]:hidden">{item.name}</span>
+                                  <span>{item.name}</span>
                               </SidebarMenuButton>
                               </Link>
                           </SidebarMenuItem>
