@@ -4,8 +4,8 @@ import { useState } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
-import { getDatabase, ref, push, serverTimestamp } from "firebase/database";
-import { app } from "@/lib/firebase";
+import { collection, addDoc, serverTimestamp } from "firebase/firestore";
+import { useFirestore } from "@/firebase";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -27,7 +27,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { Send, Loader2 } from "lucide-react";
-import type { FirebaseAlert } from "@/lib/types";
+import { Alert, FirebaseAlert } from "@/lib/types";
 
 const alertTypes = ["Traffic", "Weather", "Accident", "Road Hazard"] as const;
 
@@ -43,6 +43,7 @@ const formSchema = z.object({
 export default function AlertForm() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
+  const firestore = useFirestore();
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -54,14 +55,15 @@ export default function AlertForm() {
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
     setIsSubmitting(true);
+    if (!firestore) return;
+
     try {
-      const db = getDatabase(app);
-      const alertsRef = ref(db, "alerts");
-      const newAlert: FirebaseAlert = {
+      const alertsRef = collection(firestore, "alerts");
+      const newAlert = {
         ...values,
         timestamp: serverTimestamp(),
       };
-      await push(alertsRef, newAlert);
+      await addDoc(alertsRef, newAlert);
       toast({
         title: "Success",
         description: "Your alert has been broadcasted.",

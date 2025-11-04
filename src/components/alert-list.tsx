@@ -1,16 +1,9 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import {
-  getDatabase,
-  ref,
-  onChildAdded,
-  off,
-  query,
-  limitToLast,
-} from "firebase/database";
-import { app } from "@/lib/firebase";
-import type { Alert, FirebaseAlert } from "@/lib/types";
+import { collection, query, orderBy, limit, Timestamp } from "firebase/firestore";
+import { useCollection, useFirestore, useMemoFirebase } from "@/firebase";
+import type { Alert } from "@/lib/types";
 import { AlertCard } from "./alert-card";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 import { Label } from "./ui/label";
@@ -18,47 +11,44 @@ import { Switch } from "./ui/switch";
 import { BellRing, BellOff } from "lucide-react";
 
 export default function AlertList() {
-  const [alerts, setAlerts] = useState<Alert[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
   const [voiceEnabled, setVoiceEnabled] = useState(false);
+  const firestore = useFirestore();
+
+  const alertsQuery = useMemoFirebase(
+    () =>
+      firestore
+        ? query(
+            collection(firestore, "alerts"),
+            orderBy("timestamp", "desc"),
+            limit(20)
+          )
+        : null,
+    [firestore]
+  );
+
+  const { data: alerts, isLoading } = useCollection<Omit<Alert, "id" | "timestamp"> & { timestamp: Timestamp }>(alertsQuery);
+
+  const processedAlerts = useMemoFirebase(() => {
+    return alerts?.map(doc => ({
+      ...doc,
+      timestamp: doc.timestamp.toDate().getTime(),
+    })) ?? [];
+  }, [alerts]);
 
   useEffect(() => {
-    const db = getDatabase(app);
-    const alertsRef = query(ref(db, "alerts"), limitToLast(20));
-
-    const handleNewAlert = (snapshot: any) => {
-      const newAlertData = snapshot.val() as FirebaseAlert;
-      const newAlert: Alert = {
-        id: snapshot.key,
-        ...newAlertData,
-        timestamp: newAlertData.timestamp as number,
-      };
-
-      setAlerts((prevAlerts) => [newAlert, ...prevAlerts]);
-      setIsLoading(false);
-
-      if (
-        voiceEnabled &&
-        typeof window !== "undefined" &&
-        window.speechSynthesis
-      ) {
-        const utterance = new SpeechSynthesisUtterance(
-          `Alert: ${newAlert.type}. ${newAlert.message}`
-        );
-        window.speechSynthesis.speak(utterance);
-      }
-    };
-
-    onChildAdded(alertsRef, handleNewAlert);
-
-    // Set a timeout to handle the case where there are no alerts
-    const timer = setTimeout(() => setIsLoading(false), 3000);
-
-    return () => {
-      off(alertsRef, "child_added", handleNewAlert);
-      clearTimeout(timer);
-    };
-  }, [voiceEnabled]);
+    if (
+      processedAlerts.length > 0 &&
+      voiceEnabled &&
+      typeof window !== "undefined" &&
+      window.speechSynthesis
+    ) {
+      const latestAlert = processedAlerts[0];
+      const utterance = new SpeechSynthesisUtterance(
+        `Alert: ${latestAlert.type}. ${latestAlert.message}`
+      );
+      window.speechSynthesis.speak(utterance);
+    }
+  }, [processedAlerts, voiceEnabled]);
 
   return (
     <Card>
@@ -84,8 +74,8 @@ export default function AlertList() {
             <p className="text-muted-foreground text-center">
               Listening for alerts...
             </p>
-          ) : alerts.length > 0 ? (
-            alerts.map((alert) => <AlertCard key={alert.id} alert={alert} />)
+          ) : processedAlerts.length > 0 ? (
+            processedAlerts.map((alert) => <AlertCard key={alert.id} alert={alert} />)
           ) : (
             <p className="text-muted-foreground text-center">
               No recent alerts. The channel is clear.

@@ -1,4 +1,4 @@
-import type { database } from 'firebase/app';
+import type { FieldValue } from 'firebase/firestore';
 
 export type AlertType = 'Traffic' | 'Weather' | 'Accident' | 'Road Hazard';
 
@@ -12,5 +12,5 @@ export type Alert = {
 export type FirebaseAlert = {
     message: string;
     type: AlertType;
-    timestamp: database.ServerValue | number;
+    timestamp: FieldValue;
 }
