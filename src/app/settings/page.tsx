@@ -4,26 +4,45 @@ import { useState, useEffect } from 'react';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
-import { BellRing, BellOff, Volume2, User, Car, MapPin } from 'lucide-react';
+import { BellRing, BellOff, Volume2, User, Car, MapPin, Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { useUser, useFirestore, useDoc, useMemoFirebase, errorEmitter, FirestorePermissionError } from '@/firebase';
+import { doc, setDoc } from 'firebase/firestore';
+import { UserProfile } from '@/lib/types';
+
 
 export default function SettingsPage() {
   const [voiceEnabled, setVoiceEnabled] = useState(false);
   const [driverName, setDriverName] = useState('');
   const [vehicleNumber, setVehicleNumber] = useState('');
   const [locationEnabled, setLocationEnabled] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   const { toast } = useToast();
+  const { user } = useUser();
+  const firestore = useFirestore();
+
+  const userProfileRef = useMemoFirebase(() => {
+    if (!firestore || !user) return null;
+    return doc(firestore, 'users', user.uid);
+  }, [firestore, user]);
+
+  const { data: userProfile, isLoading: isProfileLoading } = useDoc<UserProfile>(userProfileRef);
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
       setVoiceEnabled(localStorage.getItem('voiceAlertsEnabled') === 'true');
-      setDriverName(localStorage.getItem('driverName') || '');
-      setVehicleNumber(localStorage.getItem('vehicleNumber') || '');
       setLocationEnabled(localStorage.getItem('locationEnabled') === 'true');
     }
   }, []);
+
+  useEffect(() => {
+    if (userProfile) {
+      setDriverName(userProfile.driverName || '');
+      setVehicleNumber(userProfile.vehicleNumber || '');
+    }
+  }, [userProfile]);
 
   const handleVoiceToggle = (enabled: boolean) => {
     setVoiceEnabled(enabled);
@@ -48,15 +67,34 @@ export default function SettingsPage() {
     }
   };
   
-  const handleInfoSave = () => {
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('driverName', driverName);
-      localStorage.setItem('vehicleNumber', vehicleNumber);
-      toast({
-        title: 'Profile Saved',
-        description: 'Your driver information has been updated.',
-      });
+  const handleInfoSave = async () => {
+    if (!user || !firestore || !userProfileRef) {
+        toast({ variant: 'destructive', title: 'You must be logged in to save your profile.'});
+        return;
     }
+    setIsSaving(true);
+    const profileData = { driverName, vehicleNumber };
+
+    setDoc(userProfileRef, profileData, { merge: true }).then(() => {
+        toast({
+            title: 'Profile Saved',
+            description: 'Your driver information has been updated.',
+        });
+    }).catch(e => {
+        const permissionError = new FirestorePermissionError({
+            path: userProfileRef.path,
+            operation: 'update',
+            requestResourceData: profileData,
+          });
+        errorEmitter.emit('permission-error', permissionError);
+        toast({
+            variant: 'destructive',
+            title: 'Error Saving Profile',
+            description: 'There was a problem saving your information.',
+        });
+    }).finally(() => {
+        setIsSaving(false);
+    })
   };
 
   const testVoice = () => {
@@ -90,7 +128,8 @@ export default function SettingsPage() {
                   id="driver-name" 
                   placeholder="e.g., Jane Doe" 
                   value={driverName} 
-                  onChange={(e) => setDriverName(e.target.value)} 
+                  onChange={(e) => setDriverName(e.target.value)}
+                  disabled={isProfileLoading || isSaving}
                 />
               </div>
             </div>
@@ -102,11 +141,14 @@ export default function SettingsPage() {
                   id="vehicle-number" 
                   placeholder="e.g., ABC-123" 
                   value={vehicleNumber}
-                  onChange={(e) => setVehicleNumber(e.target.value)} 
+                  onChange={(e) => setVehicleNumber(e.target.value)}
+                  disabled={isProfileLoading || isSaving} 
                 />
               </div>
             </div>
-            <Button onClick={handleInfoSave}>Save Profile</Button>
+            <Button onClick={handleInfoSave} disabled={isProfileLoading || isSaving || !user}>
+                {isSaving ? <Loader2 className="animate-spin" /> : 'Save Profile'}
+            </Button>
           </CardContent>
         </Card>
 

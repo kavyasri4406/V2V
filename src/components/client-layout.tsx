@@ -1,11 +1,12 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 
 import { collection, query, orderBy, limit, Timestamp } from 'firebase/firestore';
-import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
+import { useCollection, useFirestore, useMemoFirebase, useAuth, useUser } from '@/firebase';
 import type { Alert } from '@/lib/types';
 import {
     SidebarProvider,
@@ -26,15 +27,18 @@ import {
     Settings,
     MessageSquareWarning,
     Car,
+    LogOut,
+    LogIn
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { signOut } from 'firebase/auth';
 
 const navigationItems = [
-    { name: 'Home', href: '/', icon: Home },
-    { name: 'Broadcast', href: '/send-alert', icon: Send },
-    { name: 'Quick Alert', href: '/detailed-alert', icon: MessageSquareWarning },
-    { name: 'Live Feed', href: '/live-feed', icon: RadioTower },
-    { name: 'Settings', href: '/settings', icon: Settings },
+    { name: 'Home', href: '/', icon: Home, auth: false },
+    { name: 'Broadcast', href: '/send-alert', icon: Send, auth: true },
+    { name: 'Quick Alert', href: '/detailed-alert', icon: MessageSquareWarning, auth: true },
+    { name: 'Live Feed', href: '/live-feed', icon: RadioTower, auth: true },
+    { name: 'Settings', href: '/settings', icon: Settings, auth: true },
 ];
 
 function VoiceAlertManager() {
@@ -92,13 +96,27 @@ function VoiceAlertManager() {
 export default function ClientLayout({ children }: { children: React.ReactNode }) {
     const pathname = usePathname();
     const [isClient, setIsClient] = useState(false);
+    const { user, isUserLoading } = useUser();
+    const auth = useAuth();
+    const router = useRouter();
 
     useEffect(() => {
         setIsClient(true);
     }, []);
+
+    useEffect(() => {
+        if (!isUserLoading && !user && navigationItems.find(item => item.href === pathname && item.auth)) {
+            router.push('/login');
+        }
+    }, [user, isUserLoading, pathname, router]);
     
-    if (!isClient) {
+    if (!isClient || isUserLoading) {
         return null;
+    }
+
+    const handleSignOut = async () => {
+        await signOut(auth);
+        router.push('/login');
     }
 
     return (
@@ -117,6 +135,7 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
                     <SidebarContent>
                         <SidebarMenu>
                             {navigationItems.map((item) => (
+                                (!item.auth || user) &&
                                 <SidebarMenuItem key={item.name}>
                                 <Link href={item.href} className="w-full">
                                     <SidebarMenuButton tooltip={item.name} isActive={pathname === item.href}>
@@ -128,8 +147,27 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
                             ))}
                         </SidebarMenu>
                     </SidebarContent>
-                    <SidebarFooter className="group-data-[collapsible=icon]:hidden">
-                        <p className="text-xs text-muted-foreground p-2">
+                    <SidebarFooter>
+                         <SidebarMenu>
+                            {user ? (
+                                <SidebarMenuItem>
+                                    <SidebarMenuButton tooltip="Sign Out" onClick={handleSignOut}>
+                                        <LogOut />
+                                        <span className="group-data-[collapsible=icon]:hidden">Sign Out</span>
+                                    </SidebarMenuButton>
+                                </SidebarMenuItem>
+                            ) : (
+                                <SidebarMenuItem>
+                                    <Link href="/login">
+                                        <SidebarMenuButton tooltip="Sign In" isActive={pathname === '/login'}>
+                                            <LogIn />
+                                            <span className="group-data-[collapsible=icon]:hidden">Sign In</span>
+                                        </SidebarMenuButton>
+                                    </Link>
+                                </SidebarMenuItem>
+                            )}
+                        </SidebarMenu>
+                        <p className="text-xs text-muted-foreground p-2 group-data-[collapsible=icon]:hidden">
                             &copy; {new Date().getFullYear()} V2V AlertCast
                         </p>
                     </SidebarFooter>

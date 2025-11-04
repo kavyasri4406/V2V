@@ -6,4 +6,11 @@ export type Alert = {
   sender_vehicle: string;
   message: string;
   timestamp: number | FieldValue;
+  userId?: string;
 };
+
+export type UserProfile = {
+  id: string;
+  driverName: string;
+  vehicleNumber: string;
+}

@@ -1,12 +1,13 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
-import { useFirestore, errorEmitter, FirestorePermissionError } from '@/firebase';
+import { collection, addDoc, serverTimestamp, doc } from 'firebase/firestore';
+import { useFirestore, errorEmitter, FirestorePermissionError, useUser, useDoc, useMemoFirebase } from '@/firebase';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2 } from 'lucide-react';
+import type { UserProfile } from '@/lib/types';
 import { 
   ShieldAlert, 
   TrafficCone, 
@@ -50,6 +51,15 @@ export default function DetailedAlertPage() {
   const [voiceEnabled, setVoiceEnabled] = useState(false);
   const firestore = useFirestore();
   const { toast } = useToast();
+  const { user } = useUser();
+
+  const userProfileRef = useMemoFirebase(() => {
+    if (!firestore || !user) return null;
+    return doc(firestore, 'users', user.uid);
+  }, [firestore, user]);
+
+  const { data: userProfile } = useDoc<UserProfile>(userProfileRef);
+
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -69,11 +79,11 @@ export default function DetailedAlertPage() {
 
   const handleQuickAction = async (message: string) => {
     setSubmittingType(message);
-    if (!firestore) {
+    if (!firestore || !user) {
       toast({
         variant: 'destructive',
         title: 'Error',
-        description: 'Database not available. Please try again later.',
+        description: 'You must be logged in to send an alert.',
       });
       setSubmittingType(null);
       return;
@@ -81,10 +91,11 @@ export default function DetailedAlertPage() {
 
     const alertsRef = collection(firestore, 'alerts');
     const newAlert = {
-      driver_name: 'Quick Action',
-      sender_vehicle: 'N/A',
+      driver_name: userProfile?.driverName || 'Anonymous',
+      sender_vehicle: userProfile?.vehicleNumber || 'N/A',
       message: message,
       timestamp: serverTimestamp(),
+      userId: user.uid,
     };
 
     addDoc(alertsRef, newAlert)

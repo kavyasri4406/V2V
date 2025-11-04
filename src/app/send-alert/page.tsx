@@ -4,8 +4,8 @@ import { useState, useEffect } from 'react';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
-import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
-import { useFirestore, errorEmitter, FirestorePermissionError } from '@/firebase';
+import { collection, addDoc, serverTimestamp, doc } from 'firebase/firestore';
+import { useFirestore, errorEmitter, FirestorePermissionError, useUser, useDoc, useMemoFirebase } from '@/firebase';
 import { Button } from '@/components/ui/button';
 import {
   Form,
@@ -19,6 +19,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import { Send, Loader2 } from 'lucide-react';
+import type { UserProfile } from '@/lib/types';
 
 const formSchema = z.object({
   message: z.string().min(5, {
@@ -33,6 +34,14 @@ export default function SendAlertPage() {
   const [voiceEnabled, setVoiceEnabled] = useState(false);
   const { toast } = useToast();
   const firestore = useFirestore();
+  const { user } = useUser();
+
+  const userProfileRef = useMemoFirebase(() => {
+    if (!firestore || !user) return null;
+    return doc(firestore, 'users', user.uid);
+  }, [firestore, user]);
+
+  const { data: userProfile } = useDoc<UserProfile>(userProfileRef);
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -59,11 +68,11 @@ export default function SendAlertPage() {
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
     setIsSubmitting(true);
-    if (!firestore) {
+    if (!firestore || !user) {
       toast({
         variant: 'destructive',
         title: 'Error',
-        description: 'Database not available. Please try again later.',
+        description: 'You must be logged in to send an alert.',
       });
       setIsSubmitting(false);
       return;
@@ -71,10 +80,11 @@ export default function SendAlertPage() {
 
     const alertsRef = collection(firestore, 'alerts');
     const newAlert = {
-      driver_name: 'Anonymous',
-      sender_vehicle: 'N/A',
+      driver_name: userProfile?.driverName || 'Anonymous',
+      sender_vehicle: userProfile?.vehicleNumber || 'N/A',
       message: values.message,
       timestamp: serverTimestamp(),
+      userId: user.uid,
     };
 
     addDoc(alertsRef, newAlert)

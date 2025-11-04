@@ -18,13 +18,34 @@
           "type": "string",
           "description": "The timestamp of when the alert was created.",
           "format": "date-time"
+        },
+        "userId": {
+          "type": "string",
+          "description": "The ID of the user who created the alert."
         }
       },
       "required": [
         "id",
         "message",
-        "timestamp"
+        "timestamp",
+        "userId"
       ]
+    },
+    "UserProfile": {
+      "title": "User Profile",
+      "description": "Stores user profile information.",
+      "type": "object",
+      "properties": {
+        "driverName": {
+          "type": "string",
+          "description": "The name of the driver."
+        },
+        "vehicleNumber": {
+          "type": "string",
+          "description": "The vehicle's identification number."
+        }
+      },
+      "required": ["driverName", "vehicleNumber"]
     },
     "SentAlert": {
       "title": "Sent Alert",
@@ -59,8 +80,7 @@
   },
   "auth": {
     "providers": [
-      "password",
-      "anonymous"
+      "password"
     ]
   },
   "firestore": {
@@ -82,16 +102,21 @@
         }
       },
       {
-        "path": "/sent-alerts/{sentAlertId}",
+        "path": "/users/{userId}",
         "definition": {
-          "entityName": "SentAlert",
+          "entityName": "UserProfile",
           "schema": {
-            "$ref": "#/backend/entities/SentAlert"
+            "$ref": "#/backend/entities/UserProfile"
           },
-          "description": "Collection for detailed alerts sent by users."
+          "description": "Stores user profile information, where `userId` is the Firebase Auth UID.",
+           "params": [
+            {
+              "name": "userId",
+              "description": "The user's unique ID from Firebase Authentication."
+            }
+          ]
         }
       }
-    ],
-    "reasoning": "Given the error is related to the Realtime Database, and the request is to fix the error as well as provide a secure and scalable data structure, it's important to focus on the Firebase Realtime Database structure. The error indicates a missing Firebase Database URL due to the absence of a Project ID during `firebase.initializeApp()`. While this isn't directly a Firestore issue, ensuring the correct initialization is crucial.\n\nFor the alerts themselves, while the original request mentioned using Realtime Database, switching to Firestore offers better scalability and security features, especially with the possibility of future expansion. Since data is simple (alerts with messages and timestamps), Firestore provides a good solution.\n\nThe proposed structure utilizes a flat collection `/alerts`. This allows for simple queries.  No user-specific data is stored, implying that alerts are global and publicly accessible (subject to rate limiting and potential moderation rules in the future which should be handled through backend logic, not directly through Firestore rules).\n\nThis structure achieves Authorization Independence because security rules primarily focus on data validation and potentially rate limiting based on source IP or other request attributes (these should be implemented in Firebase Functions to avoid Rule complexity and performance bottlenecks), rather than complex data-dependent logic.  QAPs are addressed by segregating alerts into a single collection, enabling efficient listing and querying of alerts. Since the alerts are global (no user-specific ownership), complex authorization rules based on user roles are not needed."
+    ]
   }
 }

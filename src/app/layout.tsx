@@ -5,12 +5,16 @@ import { Toaster } from '@/components/ui/toaster';
 import { FirebaseClientProvider } from '@/firebase';
 import MainLayout from '@/components/main-layout';
 import { ClientOnly } from '@/components/client-only';
+import { usePathname } from 'next/navigation';
+import { AuthLayout } from '@/components/auth-layout';
 
 export default function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const pathname = usePathname();
+  const isAuthPage = pathname === '/login';
 
   return (
     <html lang="en" className="light">
@@ -23,9 +27,13 @@ export default function RootLayout({
       </head>
       <body className="font-body antialiased">
         <FirebaseClientProvider>
-          <MainLayout>
-            {children}
-          </MainLayout>
+          {isAuthPage ? (
+             <AuthLayout>{children}</AuthLayout>
+          ) : (
+            <MainLayout>
+              {children}
+            </MainLayout>
+          )}
         </FirebaseClientProvider>
         <ClientOnly>
           <Toaster />
