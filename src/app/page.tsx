@@ -100,7 +100,7 @@ export default function Home() {
                 ) : latestAlert ? (
                   <AlertCard alert={latestAlert} />
                 ) : (
-                  <p className="text-muted-foreground text-center py-8">No alerts on the network yet.</p>
+                  <div className="text-muted-foreground text-center py-8">No alerts on the network yet.</div>
                 )}
               </CardContent>
             </Card>
@@ -116,8 +116,8 @@ export default function Home() {
                       <AlertTriangle className="h-6 w-6" />
                   </div>
                   <div>
-                    <p className="text-2xl font-bold">{areAllLoading ? <Skeleton className="h-6 w-12" /> : totalAlertsToday}</p>
-                    <p className="text-sm text-muted-foreground">Alerts Today</p>
+                    <div className="text-2xl font-bold">{areAllLoading ? <Skeleton className="h-6 w-12" /> : totalAlertsToday}</div>
+                    <div className="text-sm text-muted-foreground">Alerts Today</div>
                   </div>
                 </div>
                 <div className="flex items-center gap-4">
@@ -125,8 +125,8 @@ export default function Home() {
                       <Users className="h-6 w-6" />
                   </div>
                   <div>
-                    <p className="text-2xl font-bold">{areAllLoading ? <Skeleton className="h-6 w-12" /> : activeDrivers}</p>
-                    <p className="text-sm text-muted-foreground">Active Drivers</p>
+                    <div className="text-2xl font-bold">{areAllLoading ? <Skeleton className="h-6 w-12" /> : activeDrivers}</div>
+                    <div className="text-sm text-muted-foreground">Active Drivers</div>
                   </div>
                 </div>
               </CardContent>
