@@ -3,7 +3,7 @@ service cloud.firestore {
   match /databases/{database}/documents {
     // Rules for the 'alerts' collection
     match /alerts/{alertId} {
-      // ANYONE can read ('get') a single alert document or list the entire collection.
+      // ANYONE can read ('get', 'list') alerts.
       allow read: if true;
 
       // ONLY an authenticated user can create ('write') an alert.
