@@ -10,7 +10,7 @@ export default function Header() {
         <div className="mr-4 hidden md:flex">
           <Car className="mr-2 h-6 w-6" />
           <h1 className="text-lg font-bold tracking-tight text-foreground font-headline">
-            V2V
+            Vehicle to Vehicle Communication
           </h1>
         </div>
         <div className="flex items-center md:hidden">
