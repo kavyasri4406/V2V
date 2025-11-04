@@ -159,7 +159,7 @@ export default function LiveAlertFeedPage() {
                 </AlertDialogContent>
               </AlertDialog>
           </CardHeader>
-          <CardContent>
+          <CardContent className="pt-0">
               <div className="space-y-4">
               {isLoading ? (
                   Array.from({ length: 5 }).map((_, i) => (
