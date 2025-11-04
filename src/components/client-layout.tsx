@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 
 import { collection, query, orderBy, limit, Timestamp } from 'firebase/firestore';
-import { useCollection, useFirestore } from '@/firebase';
+import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
 import type { Alert } from '@/lib/types';
 import {
   SidebarProvider,
@@ -59,7 +59,7 @@ function VoiceAlertManager() {
         }
     }, []);
 
-    const alertsQuery = useMemo(() => {
+    const alertsQuery = useMemoFirebase(() => {
         if (!firestore) return null;
         return query(collection(firestore, 'alerts'), orderBy('timestamp', 'desc'), limit(1));
     }, [firestore]);
