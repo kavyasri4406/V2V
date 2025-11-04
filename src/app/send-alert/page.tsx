@@ -15,19 +15,12 @@ import {
   FormLabel,
   FormMessage,
 } from '@/components/ui/form';
-import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import { Send, Loader2 } from 'lucide-react';
 
 const formSchema = z.object({
-  driver_name: z.string().min(2, {
-    message: 'Driver name must be at least 2 characters.',
-  }),
-  sender_vehicle: z.string().min(2, {
-    message: 'Vehicle number must be at least 2 characters.',
-  }),
   message: z.string().min(5, {
     message: 'Alert message must be at least 5 characters.',
   }).max(280, {
@@ -43,8 +36,6 @@ export default function SendAlertPage() {
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      driver_name: '',
-      sender_vehicle: '',
       message: '',
     },
   });
@@ -63,7 +54,9 @@ export default function SendAlertPage() {
 
     const alertsRef = collection(firestore, 'alerts');
     const newAlert = {
-      ...values,
+      driver_name: 'Anonymous',
+      sender_vehicle: 'N/A',
+      message: values.message,
       timestamp: Date.now(),
     };
 
@@ -103,32 +96,6 @@ export default function SendAlertPage() {
         <CardContent>
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-              <FormField
-                control={form.control}
-                name="driver_name"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Driver Name</FormLabel>
-                    <FormControl>
-                      <Input placeholder="e.g., Jane Doe" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="sender_vehicle"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Your Vehicle Number</FormLabel>
-                    <FormControl>
-                      <Input placeholder="e.g., CA-123-XYZ" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
               <FormField
                 control={form.control}
                 name="message"
