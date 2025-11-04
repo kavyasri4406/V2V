@@ -24,7 +24,7 @@ export default function Home() {
     return query(collection(firestore, 'alerts'));
   }, [firestore]);
 
-  const { data: latestAlertData, isLoading: isLatestLoading } = useCollection<Omit<Alert, 'id' | 'timestamp'> & { timestamp: Timestamp | number | null }>(latestAlertQuery);
+  const { data: latestAlertData, isLoading: isLatestLoading } = useCollection<Omit<Alert, 'id' | 'timestamp'> & { timestamp: Timestamp | null }>(latestAlertQuery);
   const { data: allAlertsData, isLoading: areAllLoading } = useCollection(allAlertsQuery);
 
   const latestAlert = useMemo(() => {
@@ -35,8 +35,6 @@ export default function Home() {
     // Handle both Firestore Timestamp and number (from Date.now())
     const timestampMs = timestamp instanceof Timestamp
       ? timestamp.toMillis()
-      : typeof timestamp === 'number'
-      ? timestamp
       : Date.now();
 
     return {
@@ -51,7 +49,7 @@ export default function Home() {
     today.setHours(0, 0, 0, 0);
     return allAlertsData.filter(doc => {
       if (!doc.timestamp) return false;
-      const alertDate = doc.timestamp instanceof Timestamp ? doc.timestamp.toDate() : new Date(doc.timestamp);
+      const alertDate = doc.timestamp instanceof Timestamp ? doc.timestamp.toDate() : new Date();
       return alertDate >= today;
     }).length;
   }, [allAlertsData]);

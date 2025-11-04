@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
-import { collection, addDoc } from 'firebase/firestore';
+import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { useFirestore, errorEmitter, FirestorePermissionError } from '@/firebase';
 import { Button } from '@/components/ui/button';
 import {
@@ -74,7 +74,7 @@ export default function SendAlertPage() {
       driver_name: 'Anonymous',
       sender_vehicle: 'N/A',
       message: values.message,
-      timestamp: Date.now(),
+      timestamp: serverTimestamp(),
     };
 
     addDoc(alertsRef, newAlert)

@@ -16,15 +16,13 @@ export default function LiveAlertFeedPage() {
     return query(collection(firestore, 'alerts'), orderBy('timestamp', 'desc'), limit(50));
   }, [firestore]);
 
-  const { data: alerts, isLoading } = useCollection<Omit<Alert, 'id' | 'timestamp'> & { timestamp: Timestamp | number | null }>(alertsQuery);
+  const { data: alerts, isLoading } = useCollection<Omit<Alert, 'id' | 'timestamp'> & { timestamp: Timestamp | null }>(alertsQuery);
 
   const processedAlerts = useMemo(() => {
     return alerts?.map(doc => {
        const timestamp = doc.timestamp;
        const timestampMs = timestamp instanceof Timestamp
         ? timestamp.toMillis()
-        : typeof timestamp === 'number'
-        ? timestamp
         : Date.now();
 
       return {

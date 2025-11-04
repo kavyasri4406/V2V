@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { collection, addDoc } from 'firebase/firestore';
+import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { useFirestore, errorEmitter, FirestorePermissionError } from '@/firebase';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -84,7 +84,7 @@ export default function DetailedAlertPage() {
       driver_name: 'Quick Action',
       sender_vehicle: 'N/A',
       message: message,
-      timestamp: Date.now(),
+      timestamp: serverTimestamp(),
     };
 
     addDoc(alertsRef, newAlert)
