@@ -83,7 +83,7 @@ export default function Home() {
           </Card>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            <Card className="md:col-span-2">
+            <Card className="md:col-span-2 animate-in fade-in-0 delay-150 duration-500">
               <CardHeader>
                 <CardTitle>Latest Alert</CardTitle>
                 <CardDescription>The most recent broadcast on the network.</CardDescription>
@@ -105,7 +105,7 @@ export default function Home() {
               </CardContent>
             </Card>
 
-            <Card>
+            <Card className="animate-in fade-in-0 delay-300 duration-500">
               <CardHeader>
                 <CardTitle>Network Stats</CardTitle>
                 <CardDescription>Real-time network activity.</CardDescription>
