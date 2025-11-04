@@ -29,12 +29,12 @@ service cloud.firestore {
     /**
      * @description Grants public read and authenticated write access to alerts.
      * @path /alerts/{alertId}
-     * @allow (read): Any user (including unauthenticated) can read alerts.
+     * @allow (get, list): Any user (including unauthenticated) can read alerts.
      * @allow (create): Any authenticated user can create an alert.
      * @deny (update, delete): No client-side updates or deletes allowed.
      */
     match /alerts/{alertId} {
-      allow read: if true;
+      allow get, list: if true;
       allow create: if request.auth != null &&
                       request.resource.data.message is string &&
                       request.resource.data.message.size() >= 5 &&
@@ -42,8 +42,7 @@ service cloud.firestore {
                       request.resource.data.type is string &&
                       request.resource.data.type in ['Traffic', 'Weather', 'Accident', 'Road Hazard', 'Collision'] &&
                       request.resource.data.timestamp == request.time;
-      allow update: if false;
-      allow delete: if false;
+      allow update, delete: if false;
     }
   }
 }
