@@ -6,9 +6,6 @@ import { useCollection, useFirestore, useMemoFirebase } from "@/firebase";
 import type { Alert, AlertType } from "@/lib/types";
 import { AlertCard } from "./alert-card";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
-import { Label } from "./ui/label";
-import { Switch } from "./ui/switch";
-import { BellRing, BellOff } from "lucide-react";
 
 type AlertListProps = {
   filterByType?: AlertType;
@@ -77,7 +74,7 @@ export default function AlertList({ filterByType, voiceEnabled }: AlertListProps
             processedAlerts.map((alert) => <AlertCard key={alert.id} alert={alert} />)
           ) : (
             <p className="text-muted-foreground text-center py-8">
-              No recent alerts for this category.
+              No recent alerts to display.
             </p>
           )}
         </div>
