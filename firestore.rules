@@ -1,11 +1,14 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
+    // Rules for the 'alerts' collection
     match /alerts/{alertId} {
-      // Allow public read access for single document reads.
+      
+      // ANYONE can read a single alert document.
       allow get: if true;
 
-      // Allow create only for authenticated users and validate data.
+      // ONLY an authenticated user can create an alert.
+      // Data must be valid.
       allow create: if request.auth != null &&
                       request.resource.data.message is string &&
                       request.resource.data.message.size() >= 5 &&
@@ -14,12 +17,10 @@ service cloud.firestore {
                       request.resource.data.type in ['Traffic', 'Weather', 'Accident', 'Road Hazard', 'Collision'] &&
                       request.resource.data.timestamp == request.time;
 
-      // Disallow client-side updates or deletes.
+      // NO ONE can update or delete alerts from the client.
       allow update, delete: if false;
-    }
 
-    // This rule allows anyone to LIST the alerts collection.
-    match /alerts {
+      // ANYONE can list the alerts collection to see the feed.
       allow list: if true;
     }
   }
