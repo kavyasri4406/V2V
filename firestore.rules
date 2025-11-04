@@ -4,6 +4,7 @@ service cloud.firestore {
     match /alerts/{alertId} {
       allow read: if true;
       allow create: if request.auth != null;
+      allow delete: if request.auth != null;
     }
   }
 }
