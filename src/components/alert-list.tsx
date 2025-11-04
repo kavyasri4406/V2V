@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { collection, query, orderBy, limit, Timestamp } from "firebase/firestore";
 import { useCollection, useFirestore, useMemoFirebase } from "@/firebase";
 import type { Alert } from "@/lib/types";
@@ -26,13 +26,13 @@ export default function AlertList() {
     [firestore]
   );
 
-  const { data: alerts, isLoading } = useCollection<Omit<Alert, "id" | "timestamp"> & { timestamp: Timestamp }>(alertsQuery);
+  const { data: alerts, isLoading } = useCollection<Omit<Alert, "id" | "timestamp"> & { timestamp: Timestamp | null }>(alertsQuery);
 
-  const processedAlerts = useMemoFirebase(() => {
+  const processedAlerts = useMemo(() => {
     return alerts?.map(doc => ({
       ...doc,
-      timestamp: doc.timestamp.toDate().getTime(),
-    })) ?? [];
+      timestamp: doc.timestamp ? doc.timestamp.toDate().getTime() : Date.now(),
+    })).sort((a, b) => b.timestamp - a.timestamp) ?? [];
   }, [alerts]);
 
   useEffect(() => {
