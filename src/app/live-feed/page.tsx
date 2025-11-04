@@ -18,27 +18,38 @@ export default function LiveAlertFeedPage() {
     return query(collection(firestore, 'alerts'), orderBy('timestamp', 'desc'), limit(50));
   }, [firestore]);
 
-  const { data: alerts, isLoading } = useCollection<Omit<Alert, 'id' | 'timestamp'> & { timestamp: Timestamp | null }>(alertsQuery);
+  const { data: alerts, isLoading } = useCollection<Omit<Alert, 'id' | 'timestamp'> & { timestamp: Timestamp | number | null }>(alertsQuery);
 
   const processedAlerts = useMemo(() => {
-    return alerts?.map(doc => ({
-      ...doc,
-      timestamp: doc.timestamp ? (doc.timestamp instanceof Timestamp ? doc.timestamp.toMillis() : doc.timestamp) : Date.now(),
-    })).sort((a, b) => b.timestamp - a.timestamp) ?? [];
+    return alerts?.map(doc => {
+       const timestamp = doc.timestamp;
+       const timestampMs = timestamp instanceof Timestamp
+        ? timestamp.toMillis()
+        : typeof timestamp === 'number'
+        ? timestamp
+        : Date.now();
+
+      return {
+        ...doc,
+        timestamp: timestampMs,
+      };
+    }).sort((a, b) => b.timestamp - a.timestamp) ?? [];
   }, [alerts]);
   
   useEffect(() => {
-    const isEnabled = localStorage.getItem('voiceAlertsEnabled') === 'true';
-    setVoiceEnabled(isEnabled);
+    if (typeof window !== 'undefined') {
+        const isEnabled = localStorage.getItem('voiceAlertsEnabled') === 'true';
+        setVoiceEnabled(isEnabled);
 
-    const handleStorageChange = () => {
-       const isEnabled = localStorage.getItem('voiceAlertsEnabled') === 'true';
-       setVoiceEnabled(isEnabled);
-    };
+        const handleStorageChange = () => {
+           const isEnabledUpdate = localStorage.getItem('voiceAlertsEnabled') === 'true';
+           setVoiceEnabled(isEnabledUpdate);
+        };
 
-    window.addEventListener('storage', handleStorageChange);
-    return () => {
-        window.removeEventListener('storage', handleStorageChange);
+        window.addEventListener('storage', handleStorageChange);
+        return () => {
+            window.removeEventListener('storage', handleStorageChange);
+        }
     }
   }, []);
 

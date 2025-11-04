@@ -13,12 +13,12 @@ import {
 } from '@/components/ui/sidebar';
 import Header from '@/components/header';
 import Link from 'next/link';
-import { Home, Send, Settings, RadioTower, MessageSquareWarning, Siren } from 'lucide-react';
+import { Home, Send, MessageSquareWarning, RadioTower, Settings } from 'lucide-react';
 
 
 const navigationItems: { name: string, icon: React.ElementType, href: string }[] = [
     { name: 'Home', icon: Home, href: '/' },
-    { name: 'Broadcast Alert', icon: Siren, href: '/send-alert'},
+    { name: 'Broadcast Alert', icon: Send, href: '/send-alert'},
     { name: 'Detailed Alert', icon: MessageSquareWarning, href: '/detailed-alert'},
     { name: 'Live Alert Feed', icon: RadioTower, href: '/live-feed'},
 ]

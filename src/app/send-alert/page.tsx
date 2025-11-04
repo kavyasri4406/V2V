@@ -70,8 +70,7 @@ export default function SendAlertPage() {
     addDoc(alertsRef, newAlert)
       .then(() => {
         toast({
-          title: 'Success!',
-          description: 'Alert sent successfully!',
+          title: 'Alert sent successfully!',
         });
         form.reset();
       })
@@ -98,8 +97,8 @@ export default function SendAlertPage() {
     <div className="w-full max-w-2xl mx-auto">
       <Card>
         <CardHeader>
-          <CardTitle>Broadcast a New Alert</CardTitle>
-          <CardDescription>Fill out the form below to send an alert to other vehicles.</CardDescription>
+          <CardTitle>Broadcast an Alert</CardTitle>
+          <CardDescription>Fill out the form below to send an alert to other vehicles on the network.</CardDescription>
         </CardHeader>
         <CardContent>
           <Form {...form}>
@@ -111,7 +110,7 @@ export default function SendAlertPage() {
                   <FormItem>
                     <FormLabel>Driver Name</FormLabel>
                     <FormControl>
-                      <Input placeholder="e.g., John Doe" {...field} />
+                      <Input placeholder="e.g., Jane Doe" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -124,7 +123,7 @@ export default function SendAlertPage() {
                   <FormItem>
                     <FormLabel>Your Vehicle Number</FormLabel>
                     <FormControl>
-                      <Input placeholder="e.g., TN09AB1234" {...field} />
+                      <Input placeholder="e.g., CA-123-XYZ" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -152,7 +151,7 @@ export default function SendAlertPage() {
                 ) : (
                   <Send />
                 )}
-                Send Alert
+                Broadcast Alert
               </Button>
             </form>
           </Form>

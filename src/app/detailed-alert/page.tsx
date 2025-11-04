@@ -7,13 +7,13 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2 } from 'lucide-react';
-import { ShieldAlert, TrafficCone, CarCrash, Ambulance } from 'lucide-react';
+import { ShieldAlert, TrafficCone, Car, Ambulance } from 'lucide-react';
 
 
 const quickActions = [
   { name: 'Collision Ahead', icon: ShieldAlert },
   { name: 'Road Block', icon: TrafficCone },
-  { name: 'Traffic Jam', icon: CarCrash },
+  { name: 'Traffic Jam', icon: Car },
   { name: 'Emergency Vehicle Ahead', icon: Ambulance },
 ];
 

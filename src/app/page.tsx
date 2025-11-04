@@ -10,7 +10,6 @@ import { Button } from '@/components/ui/button';
 import { AlertCard } from '@/components/alert-card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Users, AlertTriangle } from 'lucide-react';
-import { formatDistanceToNow } from 'date-fns';
 
 export default function Home() {
   const firestore = useFirestore();
@@ -31,9 +30,18 @@ export default function Home() {
   const latestAlert = useMemo(() => {
     if (!latestAlertData || latestAlertData.length === 0) return null;
     const alert = latestAlertData[0];
+    const timestamp = alert.timestamp;
+
+    // Handle both Firestore Timestamp and number (from Date.now())
+    const timestampMs = timestamp instanceof Timestamp
+      ? timestamp.toMillis()
+      : typeof timestamp === 'number'
+      ? timestamp
+      : Date.now();
+
     return {
       ...alert,
-      timestamp: alert.timestamp ? alert.timestamp.toDate().getTime() : Date.now(),
+      timestamp: timestampMs,
     };
   }, [latestAlertData]);
 
@@ -43,7 +51,7 @@ export default function Home() {
     today.setHours(0, 0, 0, 0);
     return allAlertsData.filter(doc => {
       if (!doc.timestamp) return false;
-      const alertDate = doc.timestamp.toDate();
+      const alertDate = doc.timestamp instanceof Timestamp ? doc.timestamp.toDate() : new Date(doc.timestamp);
       return alertDate >= today;
     }).length;
   }, [allAlertsData]);
