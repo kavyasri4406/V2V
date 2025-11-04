@@ -1,13 +1,12 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Rules for the 'alerts' collection
+    // Match the 'alerts' collection specifically
     match /alerts/{alertId} {
-      // ANYONE can read ('get', 'list') alerts.
-      allow read: if true;
-
-      // ONLY an authenticated user can create ('write') an alert.
-      // Data must be valid according to the specified constraints.
+      // Allow anyone to read any single alert document
+      allow get: if true;
+      
+      // Allow authenticated users to create alerts with valid data
       allow create: if request.auth != null &&
                       request.resource.data.message is string &&
                       request.resource.data.message.size() >= 5 &&
@@ -16,8 +15,14 @@ service cloud.firestore {
                       request.resource.data.type in ['Traffic', 'Weather', 'Accident', 'Road Hazard', 'Collision'] &&
                       request.resource.data.timestamp == request.time;
 
-      // NO ONE can update or delete alerts from the client.
+      // Do not allow updates or deletes from the client
       allow update, delete: if false;
+    }
+
+    // This is the rule that was missing: explicitly allow listing the collection
+    match /alerts {
+      // Allow anyone to list the documents in the alerts collection
+      allow list: if true;
     }
   }
 }
