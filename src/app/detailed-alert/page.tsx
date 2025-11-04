@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { collection, addDoc } from 'firebase/firestore';
 import { useFirestore, errorEmitter, FirestorePermissionError } from '@/firebase';
 import { Button } from '@/components/ui/button';
@@ -19,8 +19,25 @@ const quickActions = [
 
 export default function DetailedAlertPage() {
   const [submittingType, setSubmittingType] = useState<string | null>(null);
+  const [voiceEnabled, setVoiceEnabled] = useState(false);
   const firestore = useFirestore();
   const { toast } = useToast();
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const storedValue = localStorage.getItem('voiceAlertsEnabled') === 'true';
+      setVoiceEnabled(storedValue);
+
+      const handleStorageChange = () => {
+         const updatedValue = localStorage.getItem('voiceAlertsEnabled') === 'true';
+         setVoiceEnabled(updatedValue);
+      }
+      window.addEventListener('storage', handleStorageChange);
+      return () => {
+        window.removeEventListener('storage', handleStorageChange);
+      }
+    }
+  }, []);
 
   const handleQuickAction = async (message: string) => {
     setSubmittingType(message);
@@ -48,6 +65,10 @@ export default function DetailedAlertPage() {
           title: 'Alert Sent!',
           description: `"${message}" has been broadcasted.`,
         });
+        if (voiceEnabled && 'speechSynthesis' in window) {
+            const utterance = new SpeechSynthesisUtterance(message);
+            window.speechSynthesis.speak(utterance);
+        }
       })
       .catch(() => {
         const permissionError = new FirestorePermissionError({
