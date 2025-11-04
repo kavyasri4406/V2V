@@ -1,15 +1,31 @@
 'use client';
 
-import { useMemo } from 'react';
-import { collection, query, orderBy, limit, Timestamp } from 'firebase/firestore';
+import { useMemo, useState } from 'react';
+import { collection, query, orderBy, limit, Timestamp, getDocs, writeBatch } from 'firebase/firestore';
 import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
 import type { Alert } from '@/lib/types';
 import { AlertCard } from '@/components/alert-card';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Button } from '@/components/ui/button';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog"
+import { Trash2, Loader2 } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
 
 export default function LiveAlertFeedPage() {
   const firestore = useFirestore();
+  const { toast } = useToast();
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const alertsQuery = useMemoFirebase(() => {
     if (!firestore) return null;
@@ -32,6 +48,51 @@ export default function LiveAlertFeedPage() {
     }).sort((a, b) => b.timestamp - a.timestamp) ?? [];
   }, [alerts]);
 
+  const handleClearAlerts = async () => {
+    if (!firestore) {
+      toast({
+        variant: 'destructive',
+        title: 'Error',
+        description: 'Database not available.',
+      });
+      return;
+    }
+    setIsDeleting(true);
+    try {
+      const alertsRef = collection(firestore, 'alerts');
+      const querySnapshot = await getDocs(alertsRef);
+      
+      if (querySnapshot.empty) {
+        toast({
+          title: 'No alerts to clear',
+        });
+        setIsDeleting(false);
+        return;
+      }
+
+      const batch = writeBatch(firestore);
+      querySnapshot.forEach((doc) => {
+        batch.delete(doc.ref);
+      });
+      await batch.commit();
+
+      toast({
+        title: 'Success!',
+        description: 'All alerts have been cleared from the feed.',
+      });
+
+    } catch (error) {
+      console.error("Error clearing alerts: ", error);
+      toast({
+        variant: 'destructive',
+        title: 'Error',
+        description: 'Failed to clear alerts. Please try again.',
+      });
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
   return (
       <div className="w-full max-w-4xl mx-auto">
           <Card className="h-full">
@@ -40,6 +101,30 @@ export default function LiveAlertFeedPage() {
                   <CardTitle>Live Alert Feed</CardTitle>
                   <CardDescription>Real-time updates from the V2V network.</CardDescription>
               </div>
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button variant="destructive" size="sm" disabled={isLoading || processedAlerts.length === 0 || isDeleting}>
+                    {isDeleting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Trash2 className="mr-2 h-4 w-4" />}
+                    Clear All
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      This action cannot be undone. This will permanently delete all alerts
+                      from the network.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                    <AlertDialogAction onClick={handleClearAlerts} disabled={isDeleting}>
+                      {isDeleting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                      Continue
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
           </CardHeader>
           <CardContent>
               <div className="space-y-4">
