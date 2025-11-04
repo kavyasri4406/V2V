@@ -136,9 +136,11 @@ export default function SendAlertPage() {
                 {isSubmitting ? (
                   <Loader2 className="animate-spin" />
                 ) : (
-                  <Send />
+                  <>
+                    <Send />
+                    Broadcast
+                  </>
                 )}
-                Broadcast Alert
               </Button>
             </form>
           </Form>
