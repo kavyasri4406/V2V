@@ -1,42 +1,12 @@
-/**
- * @fileoverview Firestore Security Rules for the Alert System.
- *
- * Core Philosophy:
- * This ruleset provides public read access to alerts while restricting write access
- * to authenticated users (including anonymous ones). This prevents unauthenticated
- * clients from writing to the database.
- *
- * Data Structure:
- * All alerts are stored in a top-level collection called `/alerts/{alertId}`.
- * Each alert document contains an `id`, a `message`, a `type`, and a `timestamp`.
- *
- * Key Security Decisions:
- * - Public Read: Alerts are intended to be publicly visible, so read access is open.
- * - Authenticated Write: To prevent abuse, only authenticated users (including anonymous users)
- *   can create alerts. Direct client-side updates and deletes are forbidden.
- * - Data Validation: Ensures that the created data has the correct fields and types.
- *
- * Denormalization for Authorization:
- *   Not applicable, as there is no complex user-based authorization.
- *
- * Structural Segregation:
- *   Not applicable, as all alerts are stored in a single, public collection.
- */
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-
-    /**
-     * @description Grants public read access to the alerts collection and authenticated write access to individual alerts.
-     * @path /alerts/{alertId}
-     * @allow (list): Any user (including unauthenticated) can list alerts in the collection.
-     * @allow (get): Any user (including unauthenticated) can read a single alert.
-     * @allow (create): Any authenticated user can create an alert.
-     * @deny (update, delete): No client-side updates or deletes allowed.
-     */
     match /alerts/{alertId} {
-      allow get: if true;
-      allow list: if true;
+      // Allow public read access to all alerts
+      allow read: if true;
+      
+      // Allow create only for authenticated users (including anonymous)
+      // and validate the data being written.
       allow create: if request.auth != null &&
                       request.resource.data.message is string &&
                       request.resource.data.message.size() >= 5 &&
@@ -44,6 +14,8 @@ service cloud.firestore {
                       request.resource.data.type is string &&
                       request.resource.data.type in ['Traffic', 'Weather', 'Accident', 'Road Hazard', 'Collision'] &&
                       request.resource.data.timestamp == request.time;
+                      
+      // Disallow any client-side updates or deletes
       allow update, delete: if false;
     }
   }
