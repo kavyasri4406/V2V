@@ -22,7 +22,7 @@ import type { Alert } from '@/lib/types';
 
 const navigationItems: { name: string, icon: React.ElementType, href: string }[] = [
     { name: 'Home', icon: Home, href: '/' },
-    { name: 'Broadcast', icon: Send, href: '/send-alert'},
+    { name: 'Send', icon: Send, href: '/send-alert'},
     { name: 'Quick Alert', icon: MessageSquareWarning, href: '/detailed-alert'},
     { name: 'Live Alert Feed', icon: RadioTower, href: '/live-feed'},
 ];
