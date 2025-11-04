@@ -4,6 +4,7 @@ import './globals.css';
 import { Toaster } from '@/components/ui/toaster';
 import { FirebaseClientProvider } from '@/firebase';
 import MainLayout from '@/components/main-layout';
+import { ClientOnly } from '@/components/client-only';
 
 export default function RootLayout({
   children,
@@ -26,7 +27,9 @@ export default function RootLayout({
             {children}
           </MainLayout>
         </FirebaseClientProvider>
-        <Toaster />
+        <ClientOnly>
+          <Toaster />
+        </ClientOnly>
       </body>
     </html>
   );
