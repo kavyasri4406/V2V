@@ -5,6 +5,7 @@ import {
   CloudSun,
   Car,
   TriangleAlert,
+  ShieldAlert,
   type LucideProps,
 } from "lucide-react";
 import type { Alert } from "@/lib/types";
@@ -14,6 +15,7 @@ const iconMap = {
   Weather: CloudSun,
   Accident: Car,
   "Road Hazard": TriangleAlert,
+  Collision: ShieldAlert,
 };
 
 export function AlertIcon({
@@ -21,5 +23,5 @@ export function AlertIcon({
   ...props
 }: { type: Alert["type"] } & LucideProps) {
   const Icon = iconMap[type];
-  return <Icon {...props} />;
+  return Icon ? <Icon {...props} /> : null;
 }

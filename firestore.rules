@@ -41,7 +41,7 @@ service cloud.firestore {
                       request.resource.data.message.size() >= 5 &&
                       request.resource.data.message.size() <= 140 &&
                       request.resource.data.type is string &&
-                      request.resource.data.type in ['Traffic', 'Weather', 'Accident', 'Road Hazard'] &&
+                      request.resource.data.type in ['Traffic', 'Weather', 'Accident', 'Road Hazard', 'Collision'] &&
                       request.resource.data.timestamp == request.time;
       allow update: if false;
       allow delete: if false;

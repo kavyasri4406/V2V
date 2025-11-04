@@ -27,8 +27,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { Send, Loader2 } from "lucide-react";
+import type { AlertType } from "@/lib/types";
 
-const alertTypes = ["Traffic", "Weather", "Accident", "Road Hazard"] as const;
+const alertTypes: AlertType[] = ["Traffic", "Weather", "Accident", "Road Hazard", "Collision"];
 
 const formSchema = z.object({
   message: z.string().min(5, {
@@ -36,7 +37,7 @@ const formSchema = z.object({
   }).max(140, {
     message: "Alert message must not exceed 140 characters.",
   }),
-  type: z.enum(alertTypes),
+  type: z.enum(alertTypes as [string, ...string[]]),
 });
 
 export default function AlertForm() {
@@ -55,6 +56,11 @@ export default function AlertForm() {
   async function onSubmit(values: z.infer<typeof formSchema>) {
     setIsSubmitting(true);
     if (!firestore) {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Database not available. Please try again later.",
+      });
       setIsSubmitting(false);
       return;
     }
