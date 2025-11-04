@@ -16,7 +16,6 @@ import {
 import Header from '@/components/header';
 import Link from 'next/link';
 import { Home, TrafficCone, CloudSun, Car, TriangleAlert, ShieldAlert, Settings } from 'lucide-react';
-import type { AlertType } from '@/lib/types';
 
 
 const alertTypes: { name: string, icon: React.ElementType, href: string }[] = [
