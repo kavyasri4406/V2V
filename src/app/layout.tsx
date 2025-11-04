@@ -6,25 +6,18 @@ import {
   Sidebar,
   SidebarContent,
   SidebarGroup,
-  SidebarInset,
   SidebarMenu,
   SidebarMenuItem,
   SidebarMenuButton,
   SidebarProvider,
-  SidebarTrigger,
 } from '@/components/ui/sidebar';
 import Header from '@/components/header';
 import Link from 'next/link';
-import { Home, TrafficCone, CloudSun, Car, TriangleAlert, ShieldAlert, Settings } from 'lucide-react';
+import { Home, Settings } from 'lucide-react';
 
 
-const alertTypes: { name: string, icon: React.ElementType, href: string }[] = [
+const navigationItems: { name: string, icon: React.ElementType, href: string }[] = [
     { name: 'Home', icon: Home, href: '/' },
-    { name: 'Traffic', icon: TrafficCone, href: '/alerts/traffic' },
-    { name: 'Weather', icon: CloudSun, href: '/alerts/weather' },
-    { name: 'Accident', icon: Car, href: '/alerts/accident' },
-    { name: 'Road Hazard', icon: TriangleAlert, href: '/alerts/road-hazard' },
-    { name: 'Collision', icon: ShieldAlert, href: '/alerts/collision' },
     { name: 'Settings', icon: Settings, href: '/settings'}
 ]
 
@@ -56,7 +49,7 @@ export default function RootLayout({
                     <SidebarContent>
                       <SidebarGroup>
                         <SidebarMenu>
-                          {alertTypes.map(item => (
+                          {navigationItems.map(item => (
                             <SidebarMenuItem key={item.name}>
                               <Link href={item.href}>
                                 <SidebarMenuButton tooltip={item.name}>
