@@ -9,9 +9,10 @@ import Link from 'next/link';
 import { ArrowLeft } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 
-function isValidAlertType(type: string): type is AlertType {
-  const validTypes: AlertType[] = ['Traffic', 'Weather', 'Accident', 'Road Hazard', 'Collision'];
-  return validTypes.includes(type as AlertType);
+const VALID_ALERT_TYPES: AlertType[] = ['Traffic', 'Weather', 'Accident', 'Road Hazard', 'Collision'];
+
+function isValidAlertType(type: any): type is AlertType {
+  return typeof type === 'string' && VALID_ALERT_TYPES.includes(type as AlertType);
 }
 
 function formatTypeName(slug: string): string {
@@ -21,14 +22,12 @@ function formatTypeName(slug: string): string {
     .join(' ');
 }
 
-
 export default function AlertTypePage() {
   const params = useParams();
   const typeSlug = Array.isArray(params.type) ? params.type[0] : params.type;
-  
   const typeName = typeSlug ? formatTypeName(typeSlug) : '';
 
-  if (!typeName || !isValidAlertType(typeName)) {
+  if (!isValidAlertType(typeName)) {
     return (
       <div className="flex min-h-screen w-full flex-col bg-background">
         <Header />
