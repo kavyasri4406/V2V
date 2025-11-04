@@ -92,7 +92,7 @@ export default function DetailedAlertPage() {
      <div className="w-full max-w-2xl mx-auto">
         <Card>
             <CardHeader>
-                <CardTitle>Detailed Alert</CardTitle>
+                <CardTitle>Quick Alert</CardTitle>
                 <CardDescription>
                     Send an instant alert with one tap.
                 </CardDescription>
