@@ -21,6 +21,12 @@ import {
 } from "@/components/ui/alert-dialog"
 import { Trash2, Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip"
 
 export default function LiveAlertFeedPage() {
   const firestore = useFirestore();
@@ -102,12 +108,21 @@ export default function LiveAlertFeedPage() {
                   <CardDescription>Real-time updates from the V2V network.</CardDescription>
               </div>
               <AlertDialog>
-                <AlertDialogTrigger asChild>
-                  <Button variant="destructive" size="sm" disabled={isLoading || processedAlerts.length === 0 || isDeleting}>
-                    {isDeleting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Trash2 className="mr-2 h-4 w-4" />}
-                    Clear All
-                  </Button>
-                </AlertDialogTrigger>
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <AlertDialogTrigger asChild>
+                        <Button variant="destructive" size="icon" disabled={isLoading || processedAlerts.length === 0 || isDeleting}>
+                          {isDeleting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+                          <span className="sr-only">Clear All Alerts</span>
+                        </Button>
+                      </AlertDialogTrigger>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>Clear All Alerts</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
                 <AlertDialogContent>
                   <AlertDialogHeader>
                     <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
