@@ -5,7 +5,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { collection, addDoc, serverTimestamp } from "firebase/firestore";
-import { useFirestore } from "@/firebase";
+import { useFirestore, errorEmitter, FirestorePermissionError } from "@/firebase";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -27,7 +27,6 @@ import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { Send, Loader2 } from "lucide-react";
-import { Alert, FirebaseAlert } from "@/lib/types";
 
 const alertTypes = ["Traffic", "Weather", "Accident", "Road Hazard"] as const;
 
@@ -55,30 +54,43 @@ export default function AlertForm() {
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
     setIsSubmitting(true);
-    if (!firestore) return;
-
-    try {
-      const alertsRef = collection(firestore, "alerts");
-      const newAlert = {
-        ...values,
-        timestamp: serverTimestamp(),
-      };
-      await addDoc(alertsRef, newAlert);
-      toast({
-        title: "Success",
-        description: "Your alert has been broadcasted.",
-      });
-      form.reset();
-    } catch (error) {
-      console.error("Error sending alert:", error);
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: "Failed to broadcast alert. Please try again.",
-      });
-    } finally {
+    if (!firestore) {
       setIsSubmitting(false);
+      return;
     }
+
+    const alertsRef = collection(firestore, "alerts");
+    const newAlert = {
+      ...values,
+      timestamp: serverTimestamp(),
+    };
+
+    addDoc(alertsRef, newAlert)
+      .then(() => {
+        toast({
+          title: "Success",
+          description: "Your alert has been broadcasted.",
+        });
+        form.reset();
+      })
+      .catch((error) => {
+        const permissionError = new FirestorePermissionError({
+          path: alertsRef.path,
+          operation: 'create',
+          requestResourceData: newAlert,
+        });
+        errorEmitter.emit('permission-error', permissionError);
+
+        // Also show a generic error to the user in the UI
+        toast({
+          variant: "destructive",
+          title: "Error",
+          description: "Failed to broadcast alert. Please try again.",
+        });
+      })
+      .finally(() => {
+        setIsSubmitting(false);
+      });
   }
 
   return (
