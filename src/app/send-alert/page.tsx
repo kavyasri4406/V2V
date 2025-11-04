@@ -112,25 +112,25 @@ export default function SendAlertPage() {
   }
 
   return (
-      <div className="w-full max-w-2xl mx-auto">
-        <Card>
+      <div className="w-full max-w-2xl mx-auto flex flex-col h-full">
+        <Card className="flex flex-col flex-grow">
           <CardHeader>
             <CardTitle>Broadcast an Alert</CardTitle>
             <CardDescription>Describe the situation in detail.</CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent className="flex flex-col flex-grow">
             <Form {...form}>
-              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6 flex flex-col flex-grow">
                 <FormField
                   control={form.control}
                   name="message"
                   render={({ field }) => (
-                    <FormItem>
+                    <FormItem className="flex flex-col flex-grow">
                       <FormLabel>Alert Message</FormLabel>
                       <FormControl>
                         <Textarea
                           placeholder="e.g., Standstill traffic on I-5 North due to an accident near the bridge."
-                          className="min-h-[120px] resize-y"
+                          className="flex-grow resize-none"
                           {...field}
                         />
                       </FormControl>
