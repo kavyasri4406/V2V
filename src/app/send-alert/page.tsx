@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
-import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, addDoc } from 'firebase/firestore';
 import { useFirestore, errorEmitter, FirestorePermissionError } from '@/firebase';
 import { Button } from '@/components/ui/button';
 import {
@@ -25,7 +25,7 @@ const formSchema = z.object({
   driver_name: z.string().min(2, {
     message: 'Driver name must be at least 2 characters.',
   }),
-  vehicle_number: z.string().min(2, {
+  sender_vehicle: z.string().min(2, {
     message: 'Vehicle number must be at least 2 characters.',
   }),
   message: z.string().min(5, {
@@ -44,7 +44,7 @@ export default function SendAlertPage() {
     resolver: zodResolver(formSchema),
     defaultValues: {
       driver_name: '',
-      vehicle_number: '',
+      sender_vehicle: '',
       message: '',
     },
   });
@@ -61,23 +61,23 @@ export default function SendAlertPage() {
       return;
     }
 
-    const sentAlertsRef = collection(firestore, 'sent-alerts');
+    const alertsRef = collection(firestore, 'alerts');
     const newAlert = {
       ...values,
-      timestamp: serverTimestamp(),
+      timestamp: Date.now(),
     };
 
-    addDoc(sentAlertsRef, newAlert)
+    addDoc(alertsRef, newAlert)
       .then(() => {
         toast({
-          title: 'Success',
-          description: 'Your alert has been sent.',
+          title: 'Success!',
+          description: 'Alert sent successfully!',
         });
         form.reset();
       })
       .catch(() => {
         const permissionError = new FirestorePermissionError({
-          path: sentAlertsRef.path,
+          path: alertsRef.path,
           operation: 'create',
           requestResourceData: newAlert,
         });
@@ -95,71 +95,69 @@ export default function SendAlertPage() {
   }
 
   return (
-    <div className="container mx-auto p-4 md:p-8">
-      <div className="w-full max-w-2xl mx-auto">
-        <Card>
-          <CardHeader>
-            <CardTitle>Send a New Alert</CardTitle>
-            <CardDescription>Fill out the form below to send an alert to other vehicles.</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Form {...form}>
-              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-                <FormField
-                  control={form.control}
-                  name="driver_name"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Driver Name</FormLabel>
-                      <FormControl>
-                        <Input placeholder="e.g., John Doe" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="vehicle_number"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Vehicle Number</FormLabel>
-                      <FormControl>
-                        <Input placeholder="e.g., ABC-1234" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="message"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Alert Message</FormLabel>
-                      <FormControl>
-                        <Textarea
-                          placeholder="Describe the situation..."
-                          {...field}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <Button type="submit" disabled={isSubmitting} className="w-full">
-                  {isSubmitting ? (
-                    <Loader2 className="animate-spin" />
-                  ) : (
-                    <Send />
-                  )}
-                  Send Alert
-                </Button>
-              </form>
-            </Form>
-          </CardContent>
-        </Card>
-      </div>
+    <div className="w-full max-w-2xl mx-auto">
+      <Card>
+        <CardHeader>
+          <CardTitle>Broadcast a New Alert</CardTitle>
+          <CardDescription>Fill out the form below to send an alert to other vehicles.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+              <FormField
+                control={form.control}
+                name="driver_name"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Driver Name</FormLabel>
+                    <FormControl>
+                      <Input placeholder="e.g., John Doe" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="sender_vehicle"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Your Vehicle Number</FormLabel>
+                    <FormControl>
+                      <Input placeholder="e.g., TN09AB1234" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="message"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Alert Message</FormLabel>
+                    <FormControl>
+                      <Textarea
+                        placeholder="Describe the situation..."
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <Button type="submit" disabled={isSubmitting} className="w-full">
+                {isSubmitting ? (
+                  <Loader2 className="animate-spin" />
+                ) : (
+                  <Send />
+                )}
+                Send Alert
+              </Button>
+            </form>
+          </Form>
+        </CardContent>
+      </Card>
     </div>
   );
 }

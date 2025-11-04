@@ -13,12 +13,14 @@ import {
 } from '@/components/ui/sidebar';
 import Header from '@/components/header';
 import Link from 'next/link';
-import { Home, Settings, Send } from 'lucide-react';
+import { Home, Send, Settings, RadioTower, MessageSquareWarning, Siren } from 'lucide-react';
 
 
 const navigationItems: { name: string, icon: React.ElementType, href: string }[] = [
     { name: 'Home', icon: Home, href: '/' },
-    { name: 'Send Alert', icon: Send, href: '/send-alert'},
+    { name: 'Broadcast Alert', icon: Siren, href: '/send-alert'},
+    { name: 'Detailed Alert', icon: MessageSquareWarning, href: '/detailed-alert'},
+    { name: 'Live Alert Feed', icon: RadioTower, href: '/live-feed'},
 ]
 
 export const metadata: Metadata = {
@@ -74,7 +76,7 @@ export default function RootLayout({
                       </SidebarGroup>
                     </SidebarContent>
                   </Sidebar>
-                  <main className="flex-1 bg-muted/30">
+                  <main className="flex-1 bg-muted/30 p-4 sm:p-6 md:p-8">
                     {children}
                   </main>
                 </div>

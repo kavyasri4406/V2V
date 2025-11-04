@@ -1,109 +1,130 @@
 'use client';
 
-import { useState } from 'react';
-import AlertForm from '@/components/alert-form';
-import AlertList from '@/components/alert-list';
-import { Car, TriangleAlert, TrafficCone, ShieldAlert } from 'lucide-react';
-import type { AlertType } from '@/lib/types';
+import { useMemo } from 'react';
+import Link from 'next/link';
+import { collection, query, orderBy, limit, Timestamp } from 'firebase/firestore';
+import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
+import type { Alert } from '@/lib/types';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { useFirestore, errorEmitter, FirestorePermissionError } from '@/firebase';
-import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
-import { useToast } from '@/hooks/use-toast';
-import { Loader2 } from 'lucide-react';
-
-const quickActions: { name: AlertType; icon: React.ElementType }[] = [
-  { name: 'Traffic', icon: TrafficCone },
-  { name: 'Accident', icon: Car },
-  { name: 'Collision', icon: ShieldAlert },
-  { name: 'Road Hazard', icon: TriangleAlert },
-];
+import { AlertCard } from '@/components/alert-card';
+import { Skeleton } from '@/components/ui/skeleton';
+import { Users, AlertTriangle } from 'lucide-react';
+import { formatDistanceToNow } from 'date-fns';
 
 export default function Home() {
-  const [submittingType, setSubmittingType] = useState<AlertType | null>(null);
   const firestore = useFirestore();
-  const { toast } = useToast();
 
-  const handleQuickAction = async (type: AlertType) => {
-    setSubmittingType(type);
-    if (!firestore) {
-      toast({
-        variant: 'destructive',
-        title: 'Error',
-        description: 'Database not available. Please try again later.',
-      });
-      setSubmittingType(null);
-      return;
-    }
+  const latestAlertQuery = useMemoFirebase(() => {
+    if (!firestore) return null;
+    return query(collection(firestore, 'alerts'), orderBy('timestamp', 'desc'), limit(1));
+  }, [firestore]);
 
-    const alertsRef = collection(firestore, 'alerts');
-    const newAlert = {
-      message: `Quick report for ${type}.`,
-      type: type,
-      timestamp: serverTimestamp(),
+  const allAlertsQuery = useMemoFirebase(() => {
+    if (!firestore) return null;
+    return query(collection(firestore, 'alerts'));
+  }, [firestore]);
+
+  const { data: latestAlertData, isLoading: isLatestLoading } = useCollection<Omit<Alert, 'id' | 'timestamp'> & { timestamp: Timestamp | null }>(latestAlertQuery);
+  const { data: allAlertsData, isLoading: areAllLoading } = useCollection(allAlertsQuery);
+
+  const latestAlert = useMemo(() => {
+    if (!latestAlertData || latestAlertData.length === 0) return null;
+    const alert = latestAlertData[0];
+    return {
+      ...alert,
+      timestamp: alert.timestamp ? alert.timestamp.toDate().getTime() : Date.now(),
     };
+  }, [latestAlertData]);
 
-    addDoc(alertsRef, newAlert)
-      .then(() => {
-        toast({
-          title: 'Success',
-          description: `Your ${type} alert has been broadcasted.`,
-        });
-      })
-      .catch(() => {
-        const permissionError = new FirestorePermissionError({
-          path: alertsRef.path,
-          operation: 'create',
-          requestResourceData: newAlert,
-        });
-        errorEmitter.emit('permission-error', permissionError);
-        toast({
-          variant: 'destructive',
-          title: 'Error',
-          description: 'Failed to broadcast alert. Please try again.',
-        });
-      })
-      .finally(() => {
-        setSubmittingType(null);
-      });
-  };
+  const totalAlertsToday = useMemo(() => {
+    if (!allAlertsData) return 0;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    return allAlertsData.filter(doc => {
+      if (!doc.timestamp) return false;
+      const alertDate = doc.timestamp.toDate();
+      return alertDate >= today;
+    }).length;
+  }, [allAlertsData]);
+
+  const activeDrivers = useMemo(() => {
+    if (!allAlertsData) return 0;
+    const uniqueDrivers = new Set(allAlertsData.map(doc => doc.driver_name));
+    return uniqueDrivers.size;
+  }, [allAlertsData]);
+
 
   return (
     <div className="container mx-auto p-4 md:p-8">
-      <div className="grid grid-cols-1 gap-8 lg:grid-cols-3">
-        <div className="lg:col-span-1 space-y-8">
-            <Card>
-                <CardHeader>
-                    <CardTitle>Broadcast an Alert</CardTitle>
-                    <CardDescription>
-                        Use a quick action or fill out the form below.
-                    </CardDescription>
-                </CardHeader>
-                <CardContent className="grid grid-cols-2 gap-4">
-                  {quickActions.map((action) => (
-                    <Button
-                      key={action.name}
-                      variant="outline"
-                      size="lg"
-                      onClick={() => handleQuickAction(action.name)}
-                      disabled={!!submittingType}
-                      className="flex-col h-auto py-4"
-                    >
-                      {submittingType === action.name ? (
-                        <Loader2 className="animate-spin" />
-                      ) : (
-                        <action.icon className="h-6 w-6 mb-2" />
-                      )}
-                      {action.name}
-                    </Button>
-                  ))}
-                </CardContent>
-            </Card>
-            <AlertForm />
+      <div className="space-y-8">
+        <Card className="bg-card shadow-lg border-none animate-in fade-in-0 duration-500">
+          <CardHeader>
+            <CardTitle className="text-3xl font-bold tracking-tight">Welcome to the V2V Safety Network</CardTitle>
+            <CardDescription className="text-lg text-muted-foreground">
+              Stay aware. Stay connected. Get real-time alerts from nearby vehicles.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Link href="/live-feed">
+              <Button size="lg" className="bg-primary hover:bg-primary/90 hover:shadow-lg hover:shadow-primary/30 transition-shadow duration-300">
+                Go to Live Feed
+              </Button>
+            </Link>
+          </CardContent>
+        </Card>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+          <Card className="md:col-span-2">
+            <CardHeader>
+              <CardTitle>Latest Alert</CardTitle>
+              <CardDescription>The most recent broadcast on the network.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {isLatestLoading ? (
+                 <div className="flex items-center space-x-4">
+                    <Skeleton className="h-12 w-12 rounded-full" />
+                    <div className="space-y-2">
+                      <Skeleton className="h-4 w-[250px]" />
+                      <Skeleton className="h-4 w-[200px]" />
+                    </div>
+                  </div>
+              ) : latestAlert ? (
+                <AlertCard alert={latestAlert} />
+              ) : (
+                <p className="text-muted-foreground text-center py-8">No alerts on the network yet.</p>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Network Stats</CardTitle>
+              <CardDescription>Real-time network activity.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="flex items-center gap-4">
+                <div className="p-3 rounded-full bg-accent/10 text-accent">
+                    <AlertTriangle className="h-6 w-6" />
+                </div>
+                <div>
+                  <p className="text-2xl font-bold">{areAllLoading ? <Skeleton className="h-6 w-12" /> : totalAlertsToday}</p>
+                  <p className="text-sm text-muted-foreground">Alerts Today</p>
+                </div>
+              </div>
+               <div className="flex items-center gap-4">
+                <div className="p-3 rounded-full bg-primary/10 text-primary">
+                    <Users className="h-6 w-6" />
+                </div>
+                <div>
+                  <p className="text-2xl font-bold">{areAllLoading ? <Skeleton className="h-6 w-12" /> : activeDrivers}</p>
+                  <p className="text-sm text-muted-foreground">Active Drivers</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
         </div>
-        <div className="lg:col-span-2">
-            <AlertList />
-        </div>
+
       </div>
     </div>
   );

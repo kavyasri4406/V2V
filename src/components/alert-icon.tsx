@@ -1,27 +1,37 @@
-"use client";
-
 import {
   TrafficCone,
-  CloudSun,
   Car,
   TriangleAlert,
   ShieldAlert,
+  Siren,
+  Info,
   type LucideProps,
+  MessageSquareWarning,
 } from "lucide-react";
-import type { Alert } from "@/lib/types";
 
-const iconMap = {
-  Traffic: TrafficCone,
-  Weather: CloudSun,
-  Accident: Car,
-  "Road Hazard": TriangleAlert,
-  Collision: ShieldAlert,
+const iconMap: { [key: string]: React.ElementType } = {
+  collision: ShieldAlert,
+  accident: Car,
+  "road block": TrafficCone,
+  "traffic jam": TrafficCone,
+  hazard: TriangleAlert,
+  emergency: Siren,
+  default: MessageSquareWarning,
 };
 
 export function AlertIcon({
-  type,
+  message,
   ...props
-}: { type: Alert["type"] } & LucideProps) {
-  const Icon = iconMap[type];
-  return Icon ? <Icon {...props} /> : null;
+}: { message: string } & LucideProps) {
+  const lowerCaseMessage = message.toLowerCase();
+  let Icon = iconMap.default;
+
+  for (const keyword in iconMap) {
+    if (lowerCaseMessage.includes(keyword)) {
+      Icon = iconMap[keyword];
+      break;
+    }
+  }
+
+  return <Icon {...props} />;
 }
