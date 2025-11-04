@@ -3,9 +3,7 @@
 import AlertList from '@/components/alert-list';
 import type { AlertType } from '@/lib/types';
 import { useMemo } from 'react';
-import {
-  capitalize
-} from 'lodash';
+import { capitalize } from 'lodash';
 
 type AlertTypePageProps = {
   params: {
