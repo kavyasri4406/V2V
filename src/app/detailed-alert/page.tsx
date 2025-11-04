@@ -12,7 +12,7 @@ import { ShieldAlert, TrafficCone, Car, Ambulance } from 'lucide-react';
 
 const quickActions = [
   { name: 'Collision Ahead', icon: ShieldAlert },
-  { name: 'Road Block', icon: TrafficCone },
+  { name: 'Road Hazard', icon: TrafficCone },
   { name: 'Traffic Jam', icon: Car },
   { name: 'Emergency Vehicle Ahead', icon: Ambulance },
 ];

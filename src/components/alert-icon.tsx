@@ -12,8 +12,8 @@ import {
 const iconMap: { [key: string]: React.ElementType } = {
   collision: ShieldAlert,
   accident: Car,
-  "road block": TrafficCone,
-  "traffic jam": TrafficCone,
+  "road hazard": TrafficCone,
+  "traffic jam": Car,
   hazard: TriangleAlert,
   emergency: Siren,
   default: MessageSquareWarning,
