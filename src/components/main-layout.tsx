@@ -108,7 +108,7 @@ export default function MainLayout({
                               <Link href={item.href}>
                               <SidebarMenuButton tooltip={item.name}>
                                   <item.icon />
-                                  <span>{item.name}</span>
+                                  <span className="group-data-[collapsible=icon]:hidden">{item.name}</span>
                               </SidebarMenuButton>
                               </Link>
                           </SidebarMenuItem>
@@ -121,7 +121,7 @@ export default function MainLayout({
                               <Link href="/settings">
                               <SidebarMenuButton tooltip="Settings">
                                   <Settings />
-                                  <span>Settings</span>
+                                  <span className="group-data-[collapsible=icon]:hidden">Settings</span>
                               </SidebarMenuButton>
                               </Link>
                           </SidebarMenuItem>
