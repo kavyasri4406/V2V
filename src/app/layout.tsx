@@ -59,7 +59,7 @@ export default function RootLayout({
                         <SidebarMenu>
                           {alertTypes.map(item => (
                             <SidebarMenuItem key={item.name}>
-                              <Link href={item.href} legacyBehavior passHref>
+                              <Link href={item.href}>
                                 <SidebarMenuButton tooltip={item.name}>
                                   <item.icon />
                                   <span>{item.name}</span>
