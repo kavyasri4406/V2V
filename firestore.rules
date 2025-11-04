@@ -18,7 +18,7 @@ service cloud.firestore {
       allow update, delete: if false;
     }
 
-    // This rule allows anyone to LIST the alerts collection. This is what was missing.
+    // This rule allows anyone to LIST the alerts collection.
     match /alerts {
       allow list: if true;
     }
