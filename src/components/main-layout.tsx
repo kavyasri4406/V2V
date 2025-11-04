@@ -25,11 +25,7 @@ const navigationItems: { name: string, icon: React.ElementType, href: string }[]
     { name: 'Live Alert Feed', icon: RadioTower, href: '/live-feed'},
 ];
 
-export default function MainLayout({
-  children,
-}: Readonly<{
-  children: React.ReactNode;
-}>) {
+function VoiceAlertManager() {
   const firestore = useFirestore();
   const [voiceEnabled, setVoiceEnabled] = useState(false);
   const lastSpokenAlertId = useRef<string | null>(null);
@@ -88,47 +84,56 @@ export default function MainLayout({
     }
   }, [processedAlerts, voiceEnabled]);
 
+  return null; // This component does not render anything
+}
 
+
+export default function MainLayout({
+  children,
+}: Readonly<{
+  children: React.ReactNode;
+}>) {
   return (
-     <SidebarProvider>
-        <div className="flex min-h-screen flex-col">
-        <Header />
-            <div className="flex flex-1">
-                <Sidebar collapsible="icon" className="p-2">
-                <SidebarContent>
-                    <SidebarGroup>
-                    <SidebarMenu>
-                        {navigationItems.map(item => (
-                        <SidebarMenuItem key={item.name}>
-                            <Link href={item.href}>
-                            <SidebarMenuButton tooltip={item.name}>
-                                <item.icon />
-                                <span>{item.name}</span>
-                            </SidebarMenuButton>
-                            </Link>
-                        </SidebarMenuItem>
-                        ))}
-                    </SidebarMenu>
-                    </SidebarGroup>
-                    <SidebarGroup>
-                    <SidebarMenu>
-                        <SidebarMenuItem>
-                            <Link href="/settings">
-                            <SidebarMenuButton tooltip="Settings">
-                                <Settings />
-                                <span>Settings</span>
-                            </SidebarMenuButton>
-                            </Link>
-                        </SidebarMenuItem>
-                    </SidebarMenu>
-                    </SidebarGroup>
-                </SidebarContent>
-                </Sidebar>
-                <main className="flex-1 bg-muted/30 p-4 sm:p-6 md:p-8">
-                {children}
-                </main>
-            </div>
-        </div>
-    </SidebarProvider>
+      <SidebarProvider>
+          <VoiceAlertManager />
+          <div className="flex min-h-screen flex-col">
+          <Header />
+              <div className="flex flex-1">
+                  <Sidebar collapsible="icon" className="p-2">
+                  <SidebarContent>
+                      <SidebarGroup>
+                      <SidebarMenu>
+                          {navigationItems.map(item => (
+                          <SidebarMenuItem key={item.name}>
+                              <Link href={item.href}>
+                              <SidebarMenuButton tooltip={item.name}>
+                                  <item.icon />
+                                  <span>{item.name}</span>
+                              </SidebarMenuButton>
+                              </Link>
+                          </SidebarMenuItem>
+                          ))}
+                      </SidebarMenu>
+                      </SidebarGroup>
+                      <SidebarGroup>
+                      <SidebarMenu>
+                          <SidebarMenuItem>
+                              <Link href="/settings">
+                              <SidebarMenuButton tooltip="Settings">
+                                  <Settings />
+                                  <span>Settings</span>
+                              </SidebarMenuButton>
+                              </Link>
+                          </SidebarMenuItem>
+                      </SidebarMenu>
+                      </SidebarGroup>
+                  </SidebarContent>
+                  </Sidebar>
+                  <main className="flex-1 bg-muted/30 p-4 sm:p-6 md:p-8">
+                  {children}
+                  </main>
+              </div>
+          </div>
+      </SidebarProvider>
   );
 }

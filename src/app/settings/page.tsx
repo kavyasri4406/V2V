@@ -46,35 +46,35 @@ export default function SettingsPage() {
   };
 
   return (
-    <div className="w-full max-w-2xl mx-auto space-y-8">
-      <h1 className="text-3xl font-bold tracking-tight">Settings</h1>
-      <Card>
-        <CardHeader>
-          <CardTitle>Notifications</CardTitle>
-          <CardDescription>Manage how you receive alerts.</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="flex items-center justify-between rounded-lg border p-4">
-            <div className="flex items-center space-x-2">
-              {voiceEnabled ? (
-                <BellRing className="text-primary" />
-              ) : (
-                <BellOff className="text-muted-foreground" />
-              )}
-              <Label htmlFor="voice-alerts" className="cursor-pointer">Voice Alerts</Label>
+      <div className="w-full max-w-2xl mx-auto space-y-8">
+        <h1 className="text-3xl font-bold tracking-tight">Settings</h1>
+        <Card>
+          <CardHeader>
+            <CardTitle>Notifications</CardTitle>
+            <CardDescription>Manage how you receive alerts.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex items-center justify-between rounded-lg border p-4">
+              <div className="flex items-center space-x-2">
+                {voiceEnabled ? (
+                  <BellRing className="text-primary" />
+                ) : (
+                  <BellOff className="text-muted-foreground" />
+                )}
+                <Label htmlFor="voice-alerts" className="cursor-pointer">Voice Alerts</Label>
+              </div>
+              <Switch
+                id="voice-alerts"
+                checked={voiceEnabled}
+                onCheckedChange={handleToggleChange}
+              />
             </div>
-            <Switch
-              id="voice-alerts"
-              checked={voiceEnabled}
-              onCheckedChange={handleToggleChange}
-            />
-          </div>
-          <Button variant="outline" onClick={testVoice} disabled={!voiceEnabled}>
-            <Volume2 className="mr-2" />
-            Test Voice Alert
-          </Button>
-        </CardContent>
-      </Card>
-    </div>
+            <Button variant="outline" onClick={testVoice} disabled={!voiceEnabled}>
+              <Volume2 className="mr-2" />
+              Test Voice Alert
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
   );
 }

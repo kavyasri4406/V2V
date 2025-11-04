@@ -35,36 +35,36 @@ export default function LiveAlertFeedPage() {
   }, [alerts]);
 
   return (
-    <div className="w-full max-w-4xl mx-auto">
-        <Card className="h-full">
-        <CardHeader className="flex flex-row items-center justify-between">
-            <div>
-                <CardTitle>Live Alert Feed</CardTitle>
-                <CardDescription>Real-time updates from the V2V network.</CardDescription>
-            </div>
-        </CardHeader>
-        <CardContent>
-            <div className="space-y-4">
-            {isLoading ? (
-                Array.from({ length: 5 }).map((_, i) => (
-                    <div className="flex items-center space-x-4 p-4" key={i}>
-                        <Skeleton className="h-12 w-12 rounded-full" />
-                        <div className="space-y-2">
-                        <Skeleton className="h-4 w-[250px]" />
-                        <Skeleton className="h-4 w-[200px]" />
-                        </div>
-                    </div>
-                ))
-            ) : processedAlerts.length > 0 ? (
-                processedAlerts.map((alert) => <AlertCard key={alert.id} alert={alert} />)
-            ) : (
-                <p className="text-muted-foreground text-center py-8">
-                No recent alerts to display. The network is quiet.
-                </p>
-            )}
-            </div>
-        </CardContent>
-        </Card>
-    </div>
+      <div className="w-full max-w-4xl mx-auto">
+          <Card className="h-full">
+          <CardHeader className="flex flex-row items-center justify-between">
+              <div>
+                  <CardTitle>Live Alert Feed</CardTitle>
+                  <CardDescription>Real-time updates from the V2V network.</CardDescription>
+              </div>
+          </CardHeader>
+          <CardContent>
+              <div className="space-y-4">
+              {isLoading ? (
+                  Array.from({ length: 5 }).map((_, i) => (
+                      <div className="flex items-center space-x-4 p-4" key={i}>
+                          <Skeleton className="h-12 w-12 rounded-full" />
+                          <div className="space-y-2">
+                          <Skeleton className="h-4 w-[250px]" />
+                          <Skeleton className="h-4 w-[200px]" />
+                          </div>
+                      </div>
+                  ))
+              ) : processedAlerts.length > 0 ? (
+                  processedAlerts.map((alert) => <AlertCard key={alert.id} alert={alert} />)
+              ) : (
+                  <p className="text-muted-foreground text-center py-8">
+                  No recent alerts to display. The network is quiet.
+                  </p>
+              )}
+              </div>
+          </CardContent>
+          </Card>
+      </div>
   );
 }

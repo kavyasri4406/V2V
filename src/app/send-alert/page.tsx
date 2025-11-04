@@ -108,44 +108,44 @@ export default function SendAlertPage() {
   }
 
   return (
-    <div className="w-full max-w-2xl mx-auto">
-      <Card>
-        <CardHeader>
-          <CardTitle>Broadcast an Alert</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-              <FormField
-                control={form.control}
-                name="message"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Alert Message</FormLabel>
-                    <FormControl>
-                      <Textarea
-                        placeholder="Describe the situation..."
-                        {...field}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <Button type="submit" disabled={isSubmitting} className="w-full">
-                {isSubmitting ? (
-                  <Loader2 className="animate-spin" />
-                ) : (
-                  <>
-                    <Send />
-                    Broadcast
-                  </>
-                )}
-              </Button>
-            </form>
-          </Form>
-        </CardContent>
-      </Card>
-    </div>
+      <div className="w-full max-w-2xl mx-auto">
+        <Card>
+          <CardHeader>
+            <CardTitle>Broadcast an Alert</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <Form {...form}>
+              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+                <FormField
+                  control={form.control}
+                  name="message"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Alert Message</FormLabel>
+                      <FormControl>
+                        <Textarea
+                          placeholder="Describe the situation..."
+                          {...field}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <Button type="submit" disabled={isSubmitting} className="w-full">
+                  {isSubmitting ? (
+                    <Loader2 className="animate-spin" />
+                  ) : (
+                    <>
+                      <Send />
+                      Broadcast
+                    </>
+                  )}
+                </Button>
+              </form>
+            </Form>
+          </CardContent>
+        </Card>
+      </div>
   );
 }

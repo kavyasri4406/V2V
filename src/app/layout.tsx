@@ -1,14 +1,9 @@
 'use client';
 
-import type { Metadata } from 'next';
 import './globals.css';
 import { Toaster } from '@/components/ui/toaster';
 import { FirebaseClientProvider } from '@/firebase';
 import MainLayout from '@/components/main-layout';
-
-
-// We can't use the metadata export in a client component, so we'll manage the title directly.
-// You can create a Head component if you need more complex head management.
 
 export default function RootLayout({
   children,
@@ -27,9 +22,9 @@ export default function RootLayout({
       </head>
       <body className="font-body antialiased">
         <FirebaseClientProvider>
-            <MainLayout>
-                {children}
-            </MainLayout>
+          <MainLayout>
+            {children}
+          </MainLayout>
         </FirebaseClientProvider>
         <Toaster />
       </body>

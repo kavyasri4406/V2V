@@ -89,34 +89,34 @@ export default function DetailedAlertPage() {
   };
 
   return (
-     <div className="w-full max-w-2xl mx-auto">
-        <Card>
-            <CardHeader>
-                <CardTitle>Quick Alert</CardTitle>
-                <CardDescription>
-                    Send an instant alert with one tap.
-                </CardDescription>
-            </CardHeader>
-            <CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              {quickActions.map((action) => (
-                <Button
-                  key={action.name}
-                  variant="outline"
-                  size="lg"
-                  onClick={() => handleQuickAction(action.name)}
-                  disabled={!!submittingType}
-                  className="flex-col h-auto py-6 text-base transition-all duration-300 ease-in-out transform hover:scale-105 hover:shadow-lg hover:bg-accent/10 focus:ring-2 focus:ring-accent"
-                >
-                  {submittingType === action.name ? (
-                    <Loader2 className="animate-spin h-6 w-6 mb-2" />
-                  ) : (
-                    <action.icon className="h-6 w-6 mb-2 text-accent" />
-                  )}
-                  <span className="text-center">{action.name}</span>
-                </Button>
-              ))}
-            </CardContent>
-        </Card>
-      </div>
+      <div className="w-full max-w-2xl mx-auto">
+          <Card>
+              <CardHeader>
+                  <CardTitle>Quick Alert</CardTitle>
+                  <CardDescription>
+                      Send an instant alert with one tap.
+                  </CardDescription>
+              </CardHeader>
+              <CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {quickActions.map((action) => (
+                  <Button
+                    key={action.name}
+                    variant="outline"
+                    size="lg"
+                    onClick={() => handleQuickAction(action.name)}
+                    disabled={!!submittingType}
+                    className="flex-col h-auto py-6 text-base transition-all duration-300 ease-in-out transform hover:scale-105 hover:shadow-lg hover:bg-accent/10 focus:ring-2 focus:ring-accent"
+                  >
+                    {submittingType === action.name ? (
+                      <Loader2 className="animate-spin h-6 w-6 mb-2" />
+                    ) : (
+                      <action.icon className="h-6 w-6 mb-2 text-accent" />
+                    )}
+                    <span className="text-center">{action.name}</span>
+                  </Button>
+                ))}
+              </CardContent>
+          </Card>
+        </div>
   );
 }
