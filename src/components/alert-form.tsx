@@ -24,7 +24,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { Send, Loader2 } from "lucide-react";
 import type { AlertType } from "@/lib/types";
@@ -102,7 +102,8 @@ export default function AlertForm() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Broadcast a New Alert</CardTitle>
+        <CardTitle>Detailed Alert</CardTitle>
+        <CardDescription>Submit a custom alert message.</CardDescription>
       </CardHeader>
       <CardContent>
         <Form {...form}>

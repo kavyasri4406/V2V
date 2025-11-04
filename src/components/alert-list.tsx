@@ -60,12 +60,12 @@ export default function AlertList({ filterByType }: AlertListProps) {
   }, [processedAlerts, voiceEnabled]);
 
   return (
-    <Card>
+    <Card className="h-full">
       <CardHeader className="flex flex-row items-center justify-between">
         <CardTitle>{filterByType ? 'Filtered Feed' : 'Live Alert Feed'}</CardTitle>
         <div className="flex items-center space-x-2">
           {voiceEnabled ? (
-            <BellRing className="text-primary-foreground" />
+            <BellRing className="text-primary" />
           ) : (
             <BellOff className="text-muted-foreground" />
           )}
@@ -80,13 +80,13 @@ export default function AlertList({ filterByType }: AlertListProps) {
       <CardContent>
         <div className="space-y-4">
           {isLoading ? (
-            <p className="text-muted-foreground text-center">
+            <p className="text-muted-foreground text-center py-8">
               Listening for alerts...
             </p>
           ) : processedAlerts.length > 0 ? (
             processedAlerts.map((alert) => <AlertCard key={alert.id} alert={alert} />)
           ) : (
-            <p className="text-muted-foreground text-center">
+            <p className="text-muted-foreground text-center py-8">
               No recent alerts for this category.
             </p>
           )}

@@ -3,10 +3,9 @@
 import { useState } from 'react';
 import AlertForm from '@/components/alert-form';
 import AlertList from '@/components/alert-list';
-import Header from '@/components/header';
 import { Car, TriangleAlert, TrafficCone, ShieldAlert } from 'lucide-react';
 import type { AlertType } from '@/lib/types';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useFirestore, errorEmitter, FirestorePermissionError } from '@/firebase';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
@@ -70,40 +69,42 @@ export default function Home() {
   };
 
   return (
-    <div className="flex min-h-screen w-full flex-col bg-background">
-      <Header />
-      <main className="flex flex-1 flex-col items-center gap-8 p-4 md:p-8">
-        <div className="w-full max-w-2xl">
-          <Card>
-            <CardHeader>
-              <CardTitle>Quick Actions</CardTitle>
-            </CardHeader>
-            <CardContent className="grid grid-cols-2 gap-4 md:grid-cols-4">
-              {quickActions.map((action) => (
-                <Button
-                  key={action.name}
-                  variant="outline"
-                  onClick={() => handleQuickAction(action.name)}
-                  disabled={!!submittingType}
-                >
-                  {submittingType === action.name ? (
-                    <Loader2 className="animate-spin" />
-                  ) : (
-                    <action.icon className="mr-2 h-4 w-4" />
-                  )}
-                  {action.name}
-                </Button>
-              ))}
-            </CardContent>
-          </Card>
+    <div className="container mx-auto p-4 md:p-8">
+      <div className="grid grid-cols-1 gap-8 lg:grid-cols-3">
+        <div className="lg:col-span-1 space-y-8">
+            <Card>
+                <CardHeader>
+                    <CardTitle>Broadcast an Alert</CardTitle>
+                    <CardDescription>
+                        Use a quick action or fill out the form below.
+                    </CardDescription>
+                </CardHeader>
+                <CardContent className="grid grid-cols-2 gap-4">
+                  {quickActions.map((action) => (
+                    <Button
+                      key={action.name}
+                      variant="outline"
+                      size="lg"
+                      onClick={() => handleQuickAction(action.name)}
+                      disabled={!!submittingType}
+                      className="flex-col h-auto py-4"
+                    >
+                      {submittingType === action.name ? (
+                        <Loader2 className="animate-spin" />
+                      ) : (
+                        <action.icon className="h-6 w-6 mb-2" />
+                      )}
+                      {action.name}
+                    </Button>
+                  ))}
+                </CardContent>
+            </Card>
+            <AlertForm />
         </div>
-        <div className="w-full max-w-2xl">
-          <AlertForm />
+        <div className="lg:col-span-2">
+            <AlertList />
         </div>
-        <div className="w-full max-w-2xl">
-          <AlertList />
-        </div>
-      </main>
+      </div>
     </div>
   );
 }
