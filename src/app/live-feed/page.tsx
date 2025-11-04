@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import { collection, query, orderBy, limit, Timestamp, getDocs, writeBatch } from 'firebase/firestore';
-import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
+import { useCollection, useFirestore, useMemoFirebase, errorEmitter, FirestorePermissionError } from '@/firebase';
 import type { Alert } from '@/lib/types';
 import { AlertCard } from '@/components/alert-card';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -64,39 +64,65 @@ export default function LiveAlertFeedPage() {
       return;
     }
     setIsDeleting(true);
-    try {
-      const alertsRef = collection(firestore, 'alerts');
-      const querySnapshot = await getDocs(alertsRef);
-      
-      if (querySnapshot.empty) {
+
+    const alertsRef = collection(firestore, 'alerts');
+    const querySnapshot = await getDocs(alertsRef).catch((error) => {
+        const permissionError = new FirestorePermissionError({
+            path: alertsRef.path,
+            operation: 'list',
+        });
+        errorEmitter.emit('permission-error', permissionError);
         toast({
-          title: 'No alerts to clear',
+            variant: 'destructive',
+            title: 'Permission Error',
+            description: 'Failed to fetch alerts to delete.',
         });
         setIsDeleting(false);
-        return;
-      }
+        return null;
+    });
 
-      const batch = writeBatch(firestore);
-      querySnapshot.forEach((doc) => {
-        batch.delete(doc.ref);
-      });
-      await batch.commit();
-
-      toast({
-        title: 'Success!',
-        description: 'All alerts have been cleared from the feed.',
-      });
-
-    } catch (error) {
-      console.error("Error clearing alerts: ", error);
-      toast({
-        variant: 'destructive',
-        title: 'Error',
-        description: 'Failed to clear alerts. Please try again.',
-      });
-    } finally {
-      setIsDeleting(false);
+    if (!querySnapshot) {
+      return;
     }
+    
+    if (querySnapshot.empty) {
+      toast({
+        title: 'No alerts to clear',
+      });
+      setIsDeleting(false);
+      return;
+    }
+
+    const batch = writeBatch(firestore);
+    querySnapshot.forEach((doc) => {
+      batch.delete(doc.ref);
+    });
+
+    batch.commit()
+      .then(() => {
+        toast({
+          title: 'Success!',
+          description: 'All alerts have been cleared from the feed.',
+        });
+      })
+      .catch(() => {
+        // Since batch deletes don't give individual document context,
+        // we signal the operation on the collection path.
+        const permissionError = new FirestorePermissionError({
+            path: alertsRef.path,
+            operation: 'delete',
+        });
+        errorEmitter.emit('permission-error', permissionError);
+
+        toast({
+          variant: 'destructive',
+          title: 'Error',
+          description: 'Failed to clear alerts. Please check permissions and try again.',
+        });
+      })
+      .finally(() => {
+        setIsDeleting(false);
+      });
   };
 
   return (
