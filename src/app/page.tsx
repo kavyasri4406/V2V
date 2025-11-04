@@ -82,8 +82,8 @@ export default function Home() {
             </CardContent>
           </Card>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            <Card className="md:col-span-2 animate-in fade-in-0 delay-150 duration-500">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+            <Card className="animate-in fade-in-0 delay-150 duration-500">
               <CardHeader>
                 <CardTitle>Latest Alert</CardTitle>
                 <CardDescription>The most recent broadcast on the network.</CardDescription>
