@@ -7,14 +7,43 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2 } from 'lucide-react';
-import { ShieldAlert, TrafficCone, Car, Ambulance } from 'lucide-react';
+import { 
+  ShieldAlert, 
+  TrafficCone, 
+  Car, 
+  Ambulance,
+  Trash2,
+  CircleOff,
+  Waves,
+  CloudRain,
+  CloudFog,
+  Wind,
+  Snowflake,
+  CarCrash,
+  XCircle,
+  Siren,
+  Flame,
+  TriangleAlert
+} from 'lucide-react';
 
 
 const quickActions = [
   { name: 'Collision Ahead', icon: ShieldAlert },
   { name: 'Road Hazard', icon: TrafficCone },
   { name: 'Traffic Jam', icon: Car },
-  { name: 'Emergency Vehicle Ahead', icon: Ambulance },
+  { name: 'Emergency Vehicle', icon: Ambulance },
+  { name: 'Debris on Road', icon: Trash2 },
+  { name: 'Pothole', icon: CircleOff },
+  { name: 'Slippery Road', icon: Waves },
+  { name: 'Heavy Rain', icon: CloudRain },
+  { name: 'Fog', icon: CloudFog },
+  { name: 'High Winds', icon: Wind },
+  { name: 'Icy Conditions', icon: Snowflake },
+  { name: 'Broken Down Vehicle', icon: CarCrash },
+  { name: 'Road Closure', icon: XCircle },
+  { name: 'Police Activity', icon: Siren },
+  { name: 'Fire Truck', icon: Flame },
+  { name: 'General Hazard', icon: TriangleAlert },
 ];
 
 export default function DetailedAlertPage() {
@@ -89,7 +118,7 @@ export default function DetailedAlertPage() {
   };
 
   return (
-      <div className="w-full max-w-2xl mx-auto">
+      <div className="w-full max-w-4xl mx-auto">
           <Card>
               <CardHeader>
                   <CardTitle>Quick Alert</CardTitle>
@@ -97,7 +126,7 @@ export default function DetailedAlertPage() {
                       Send an instant alert with one tap.
                   </CardDescription>
               </CardHeader>
-              <CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <CardContent className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
                 {quickActions.map((action) => (
                   <Button
                     key={action.name}
