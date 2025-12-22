@@ -36,7 +36,7 @@ import { signOut } from 'firebase/auth';
 
 const navigationItems = [
     { name: 'Home', href: '/', icon: Home, auth: false },
-    { name: 'Broadcast', href: '/send-alert', icon: Send, auth: true },
+    { name: 'Send Alert', href: '/send-alert', icon: Send, auth: true },
     { name: 'Quick Alert', href: '/detailed-alert', icon: MessageSquareWarning, auth: true },
     { name: 'Live Feed', href: '/live-feed', icon: RadioTower, auth: true },
     { name: 'Notes', href: '/notes', icon: NotebookPen, auth: true },

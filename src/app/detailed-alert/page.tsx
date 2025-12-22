@@ -42,7 +42,7 @@ const quickActions = [
   { name: 'Broken Down Vehicle', icon: ShieldAlert },
   { name: 'Road Closure', icon: XCircle },
   { name: 'Police Activity', icon: Siren },
-  { name: 'Fire Truck', icon: Flame },
+  { name: 'Fire', icon: Flame },
   { name: 'General Hazard', icon: TriangleAlert },
 ];
 
@@ -128,7 +128,7 @@ export default function DetailedAlertPage() {
               <CardHeader>
                   <CardTitle>Quick Alert</CardTitle>
                   <CardDescription>
-                      Send an instant alert with one tap.
+                      Send an instant alert with one tap. Your driver profile information will be used.
                   </CardDescription>
               </CardHeader>
               <CardContent className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">

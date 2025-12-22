@@ -9,6 +9,7 @@ import { AlertCard } from '@/components/alert-card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Users, AlertTriangle, Send, RadioTower } from 'lucide-react';
 import { useMemo } from 'react';
+import { WeatherCard } from '@/components/weather-card';
 
 
 export default function Home() {
@@ -25,7 +26,7 @@ export default function Home() {
     if (!alerts) return [];
     return alerts.map(alert => {
       const timestamp = alert.timestamp;
-      const timestampMs = timestamp instanceof Timestamp ? timestamp.toMillis() : 0;
+      const timestampMs = timestamp instanceof Timestamp ? timestamp.toMillis() : (typeof timestamp === 'number' ? timestamp : 0);
       return { ...alert, timestamp: timestampMs };
     }).filter(alert => alert.timestamp > 0) // Filter out alerts with invalid timestamps
     .sort((a, b) => b.timestamp - a.timestamp);
@@ -62,11 +63,11 @@ export default function Home() {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-            <Link href="/send-alert" className="transform transition-transform duration-300 hover:scale-105">
+            <Link href="/detailed-alert" className="transform transition-transform duration-300 hover:scale-105">
                 <Card className="h-full flex flex-col items-center justify-center text-center p-8 bg-primary/10 hover:bg-primary/20 cursor-pointer">
                     <Send className="h-12 w-12 text-primary mb-4" />
-                    <CardTitle className="text-2xl">Broadcast an Alert</CardTitle>
-                    <CardDescription>Share a real-time update with the network.</CardDescription>
+                    <CardTitle className="text-2xl">Broadcast a Quick Alert</CardTitle>
+                    <CardDescription>Send a templated alert with one tap.</CardDescription>
                 </Card>
             </Link>
             <Link href="/live-feed" className="transform transition-transform duration-300 hover:scale-105">
@@ -105,6 +106,7 @@ export default function Home() {
             </div>
             
             <div className="space-y-8">
+                <WeatherCard />
                 <Card className="animate-in fade-in-0 delay-300 duration-500">
                     <CardHeader>
                         <CardTitle>Network Overview</CardTitle>
