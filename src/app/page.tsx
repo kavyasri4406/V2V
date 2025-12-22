@@ -68,7 +68,7 @@ export default function Home() {
         return mappedAlerts.filter(alert => {
             if (alert.latitude && alert.longitude) {
                 const distance = getDistance(userLocation.latitude, userLocation.longitude, alert.latitude, alert.longitude);
-                return distance <= 20; // 20km radius
+                return distance <= 5; // 5km radius
             }
             // If location is enabled but alert has no coords, don't show it in local view.
             return false;

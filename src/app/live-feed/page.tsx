@@ -123,7 +123,7 @@ export default function LiveAlertFeedPage() {
         return mappedAlerts.filter(alert => {
             if (alert.latitude && alert.longitude) {
                 const distance = getDistance(userLocation.latitude, userLocation.longitude, alert.latitude, alert.longitude);
-                return distance <= 20; // 20km radius
+                return distance <= 5; // 5km radius
             }
             return false;
         }).sort((a, b) => b.timestamp - a.timestamp);
@@ -174,9 +174,9 @@ export default function LiveAlertFeedPage() {
         return 'Finding your location...';
       }
       if (locationName) {
-        return `Showing alerts within 20km of ${locationName}.`;
+        return `Showing alerts within 5km of ${locationName}.`;
       }
-      return 'Showing alerts within 20km.';
+      return 'Showing alerts within 5km.';
     }
     return 'Showing all alerts.';
   };
