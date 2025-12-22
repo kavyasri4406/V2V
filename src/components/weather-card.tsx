@@ -51,7 +51,7 @@ export function WeatherCard() {
         if (result.state === 'denied') {
             setWeather({ status: 'error', message: 'Location permission denied.' });
         } else {
-            // Don't auto-fetch, just set to idle to show button
+            // No cached data and permission is not denied, so wait for user to click button.
             setWeather({ status: 'idle' });
         }
         result.onchange = () => {
