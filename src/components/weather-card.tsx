@@ -17,12 +17,30 @@ type WeatherState =
   | { status: 'success'; data: GetWeatherOutput }
   | { status: 'error'; message: string };
 
+const CACHE_KEY = 'weatherData';
+const CACHE_DURATION = 10 * 60 * 1000; // 10 minutes
+
 export function WeatherCard() {
   const [weather, setWeather] = useState<WeatherState>({ status: 'idle' });
   const [permissionDenied, setPermissionDenied] = useState(false);
 
   useEffect(() => {
-    // Check for location permission on mount
+    const cachedData = sessionStorage.getItem(CACHE_KEY);
+    if (cachedData) {
+        try {
+            const { data, timestamp } = JSON.parse(cachedData);
+            if (Date.now() - timestamp < CACHE_DURATION) {
+                setWeather({ status: 'success', data });
+                if (data.latitude && data.longitude) {
+                    window.dispatchEvent(new CustomEvent('locationUpdated', { detail: { latitude: data.latitude, longitude: data.longitude } }));
+                }
+                return;
+            }
+        } catch (e) {
+            sessionStorage.removeItem(CACHE_KEY);
+        }
+    }
+
     if (navigator.permissions) {
       navigator.permissions.query({ name: 'geolocation' }).then((result) => {
         if (result.state === 'denied') {
@@ -31,12 +49,16 @@ export function WeatherCard() {
         } else if (result.state === 'granted') {
           handleGetWeather();
         }
-        // if prompt, do nothing until user clicks button
       });
+    } else {
+        handleGetWeather();
     }
   }, []);
 
-  const handleGetWeather = () => {
+  const handleGetWeather = (forceRefresh = false) => {
+    if (forceRefresh) {
+        sessionStorage.removeItem(CACHE_KEY);
+    }
     setWeather({ status: 'loading' });
     setPermissionDenied(false);
 
@@ -50,8 +72,9 @@ export function WeatherCard() {
         try {
           const { latitude, longitude } = position.coords;
           const weatherData = await getWeather({ latitude, longitude });
-          setWeather({ status: 'success', data: weatherData });
-           // Dispatch a custom event to notify other components of location update
+          const dataToCache = { data: { ...weatherData, latitude, longitude }, timestamp: Date.now() };
+          sessionStorage.setItem(CACHE_KEY, JSON.stringify(dataToCache));
+          setWeather({ status: 'success', data: dataToCache.data });
           window.dispatchEvent(new CustomEvent('locationUpdated', { detail: { latitude, longitude } }));
 
         } catch (error) {
@@ -85,7 +108,7 @@ export function WeatherCard() {
             <p className="text-sm text-muted-foreground mb-4">
               Get local weather updates.
             </p>
-            <Button onClick={handleGetWeather}>Enable Location</Button>
+            <Button onClick={() => handleGetWeather()}>Enable Location</Button>
           </div>
         );
       case 'loading':
@@ -109,7 +132,7 @@ export function WeatherCard() {
               </p>
             )}
             {!permissionDenied && (
-              <Button variant="outline" size="sm" className="mt-4" onClick={handleGetWeather}>
+              <Button variant="outline" size="sm" className="mt-4" onClick={() => handleGetWeather()}>
                 Try Again
               </Button>
             )}
@@ -120,13 +143,13 @@ export function WeatherCard() {
         return (
           <div className="flex items-center gap-4 w-full">
             <WeatherIcon condition={data.condition} className="h-10 w-10 text-primary" />
-            <div className="flex-1">
+            <div className="flex-1 overflow-hidden">
               <div className="text-3xl font-bold">
                 {Math.round(data.temperature)}&deg;C
               </div>
-              <div className="text-sm text-muted-foreground truncate">{data.location}</div>
+              <div className="text-sm text-muted-foreground truncate" title={data.location}>{data.location}</div>
             </div>
-            <Button variant="ghost" size="icon" onClick={handleGetWeather} className="shrink-0">
+            <Button variant="ghost" size="icon" onClick={() => handleGetWeather(true)} className="shrink-0">
                 <RefreshCw className="h-4 w-4 text-muted-foreground" />
                 <span className="sr-only">Recheck Location</span>
             </Button>
