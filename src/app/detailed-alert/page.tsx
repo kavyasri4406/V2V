@@ -41,7 +41,7 @@ const quickActions = [
   { name: 'Icy Conditions', icon: Snowflake },
   { name: 'Broken Down Vehicle', icon: ShieldAlert },
   { name: 'Road Closure', icon: XCircle },
-  { name 'Police Activity', icon: Siren },
+  { name: 'Police Activity', icon: Siren },
   { name: 'Fire', icon: Flame },
   { name: 'General Hazard', icon: TriangleAlert },
 ];
