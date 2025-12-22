@@ -13,7 +13,6 @@ import { WeatherIcon } from './weather-icon';
 
 type WeatherState =
   | { status: 'idle' }
-  | { status: 'prompt_permission' }
   | { status: 'loading' }
   | { status: 'success'; data: GetWeatherOutput }
   | { status: 'error'; message: string };
@@ -33,36 +32,39 @@ export function WeatherCard() {
             const { data, timestamp } = JSON.parse(cachedData);
             if (Date.now() - timestamp < CACHE_DURATION) {
                 setWeather({ status: 'success', data });
+                // Also update permission state visually
+                setPermissionState('granted');
                 if (data.latitude && data.longitude) {
                     window.dispatchEvent(new CustomEvent('locationUpdated', { detail: { latitude: data.latitude, longitude: data.longitude } }));
                 }
-                return;
+                return; // Exit if valid cache found
             }
         } catch (e) {
             sessionStorage.removeItem(CACHE_KEY);
         }
     }
 
-    // 2. Check geolocation permission status
+    // 2. Check geolocation permission status if no valid cache
     if (navigator.permissions) {
       navigator.permissions.query({ name: 'geolocation' }).then((result) => {
         setPermissionState(result.state);
         if (result.state === 'denied') {
             setWeather({ status: 'error', message: 'Location permission denied.' });
         } else {
+            // Don't auto-fetch, just set to idle to show button
             setWeather({ status: 'idle' });
         }
         result.onchange = () => {
             setPermissionState(result.state);
             if(result.state === 'denied') {
                 setWeather({ status: 'error', message: 'Location permission denied.' });
-            } else if (result.state === 'granted') {
+            } else {
                  setWeather({ status: 'idle' });
             }
         };
       });
     } else {
-      // Fallback for browsers without navigator.permissions
+      // Fallback for older browsers
       setWeather({ status: 'idle' });
     }
   }, []);
@@ -117,10 +119,10 @@ export function WeatherCard() {
           <div className="flex flex-col items-center justify-center text-center h-full">
             <MapPin className="h-8 w-8 text-muted-foreground mb-2" />
             <p className="text-sm text-muted-foreground mb-4">
-              {permissionState === 'granted' ? 'Get current weather for your location.' : 'Get local weather updates.'}
+              Get current weather for your location.
             </p>
             <Button onClick={() => handleGetWeather()}>
-              {permissionState === 'granted' ? 'Get Weather' : 'Enable Location'}
+               Get Weather
             </Button>
           </div>
         );
@@ -144,7 +146,7 @@ export function WeatherCard() {
                 Please enable location access in your browser settings.
               </p>
             )}
-            {permissionState !== 'denied' && (
+            {weather.message !== 'Location permission denied.' && (
               <Button variant="outline" size="sm" className="mt-4" onClick={() => handleGetWeather()}>
                 Try Again
               </Button>
