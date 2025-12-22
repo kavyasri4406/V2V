@@ -8,7 +8,6 @@ import { WeatherIcon } from '@/components/weather-icon';
 import { getWeather, type GetWeatherOutput } from '@/ai/flows/get-weather-flow';
 import { formatDistanceToNow } from 'date-fns';
 import { MapPin, Wind, Droplets, RefreshCw, AlertCircle, Loader2 } from 'lucide-react';
-import { useToast } from '@/hooks/use-toast';
 
 type CachedWeather = {
   data: GetWeatherOutput;
@@ -24,7 +23,6 @@ export function WeatherCard() {
   const [lastUpdated, setLastUpdated] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isRateLimited, setIsRateLimited] = useState(false);
-  const { toast } = useToast();
 
   const handleGetWeather = async (forceRefresh = false) => {
     setIsLoading(true);
@@ -81,14 +79,7 @@ export function WeatherCard() {
   };
 
   useEffect(() => {
-    navigator.permissions?.query({ name: 'geolocation' }).then((result) => {
-      setPermissionStatus(result.state);
-      setIsLoading(false); // Done with initial permission check
-      result.onchange = () => {
-        setPermissionStatus(result.state);
-      };
-    });
-
+    // Check for cached data first
     const cached = sessionStorage.getItem('weatherCache');
     if (cached) {
       const { data, timestamp }: CachedWeather = JSON.parse(cached);
@@ -97,6 +88,16 @@ export function WeatherCard() {
         setLastUpdated(timestamp);
       }
     }
+
+    // Then check permissions
+    navigator.permissions?.query({ name: 'geolocation' }).then((result) => {
+      setPermissionStatus(result.state);
+      result.onchange = () => {
+        setPermissionStatus(result.state);
+      };
+    });
+    
+    setIsLoading(false);
   }, []);
 
   const requestPermission = () => {
@@ -129,25 +130,6 @@ export function WeatherCard() {
       );
     }
     
-    if (permissionStatus === 'prompt') {
-      return (
-         <div className="text-center flex flex-col items-center gap-4">
-            <MapPin className="h-8 w-8 text-muted-foreground" />
-            <p className="text-muted-foreground">This app needs your location to show local weather.</p>
-            <Button onClick={requestPermission}>Allow Location</Button>
-        </div>
-      )
-    }
-
-    if (permissionStatus === 'denied') {
-       return (
-        <div className="text-center text-destructive flex flex-col items-center gap-4">
-            <AlertCircle className="h-8 w-8" />
-            <p>Location access denied. Please enable it in your browser settings to see local weather.</p>
-        </div>
-       )
-    }
-
     if (weather) {
       return (
         <div className="space-y-4">
@@ -157,7 +139,7 @@ export function WeatherCard() {
               <CardDescription>{weather.condition}</CardDescription>
             </div>
             <Button variant="ghost" size="icon" onClick={() => handleGetWeather(true)} disabled={isRateLimited}>
-              {isLoading ? <Loader2 className="animate-spin"/> : <RefreshCw className="h-4 w-4" />}
+               <RefreshCw className="h-4 w-4" />
               <span className="sr-only">Refresh Weather</span>
             </Button>
           </div>
@@ -183,12 +165,32 @@ export function WeatherCard() {
         </div>
       );
     }
+    
+    if (permissionStatus === 'prompt') {
+      return (
+         <div className="text-center flex flex-col items-center gap-4">
+            <MapPin className="h-8 w-8 text-muted-foreground" />
+            <p className="text-muted-foreground">Enable location access to see local weather.</p>
+            <Button onClick={requestPermission}>Allow Location</Button>
+        </div>
+      )
+    }
+
+    if (permissionStatus === 'denied') {
+       return (
+        <div className="text-center text-destructive flex flex-col items-center gap-4">
+            <AlertCircle className="h-8 w-8" />
+            <p>Location access denied. Please enable it in your browser settings to see local weather.</p>
+        </div>
+       )
+    }
+
 
     return (
         <div className="text-center flex flex-col items-center gap-4">
             <p className="text-muted-foreground">Press the button to get the current weather for your location.</p>
             <Button onClick={() => handleGetWeather(true)} disabled={isRateLimited}>
-                {isRateLimited ? <Loader2 className="animate-spin" /> : 'Get Weather'}
+                Get Weather
             </Button>
         </div>
     );
@@ -199,7 +201,6 @@ export function WeatherCard() {
     <Card className="animate-in fade-in-0 delay-200 duration-500">
       <CardHeader>
         <CardTitle>Current Weather</CardTitle>
-        <CardDescription>Real-time weather for your location.</CardDescription>
       </CardHeader>
       <CardContent>{renderContent()}</CardContent>
     </Card>
