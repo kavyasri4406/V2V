@@ -21,7 +21,7 @@ const CACHE_KEY = 'weatherData';
 const CACHE_DURATION = 10 * 60 * 1000; // 10 minutes
 
 export function WeatherCard() {
-  const [weather, setWeather] = useState<WeatherState>({ status: 'idle' });
+  const [weather, setWeather] = useState<WeatherState>({ status: 'loading' });
   const [permissionState, setPermissionState] = useState<'prompt' | 'granted' | 'denied'>('prompt');
 
   useEffect(() => {
@@ -32,7 +32,6 @@ export function WeatherCard() {
             const { data, timestamp } = JSON.parse(cachedData);
             if (Date.now() - timestamp < CACHE_DURATION) {
                 setWeather({ status: 'success', data });
-                // Also update permission state visually
                 setPermissionState('granted');
                 if (data.latitude && data.longitude) {
                     window.dispatchEvent(new CustomEvent('locationUpdated', { detail: { latitude: data.latitude, longitude: data.longitude } }));
@@ -58,6 +57,7 @@ export function WeatherCard() {
             setPermissionState(result.state);
             if(result.state === 'denied') {
                 setWeather({ status: 'error', message: 'Location permission denied.' });
+                sessionStorage.removeItem(CACHE_KEY); // Clear cache if permission is revoked
             } else {
                  setWeather({ status: 'idle' });
             }
