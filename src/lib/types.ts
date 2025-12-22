@@ -5,7 +5,7 @@ export type Alert = {
   driver_name: string;
   sender_vehicle: string;
   message: string;
-  timestamp: number | FieldValue | Timestamp;
+  timestamp: number;
   userId?: string;
 };
 
@@ -14,3 +14,12 @@ export type UserProfile = {
   driverName: string;
   vehicleNumber: string;
 }
+
+export type Note = {
+    id: string;
+    title: string;
+    description?: string;
+    createdAt: number | FieldValue | Timestamp;
+    completed: boolean;
+    userId: string;
+};

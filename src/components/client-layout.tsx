@@ -28,7 +28,8 @@ import {
     MessageSquareWarning,
     Car,
     LogOut,
-    LogIn
+    LogIn,
+    NotebookPen,
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { signOut } from 'firebase/auth';
@@ -38,6 +39,7 @@ const navigationItems = [
     { name: 'Broadcast', href: '/send-alert', icon: Send, auth: true },
     { name: 'Quick Alert', href: '/detailed-alert', icon: MessageSquareWarning, auth: true },
     { name: 'Live Feed', href: '/live-feed', icon: RadioTower, auth: true },
+    { name: 'Notes', href: '/notes', icon: NotebookPen, auth: true },
     { name: 'Settings', href: '/settings', icon: Settings, auth: true },
 ];
 

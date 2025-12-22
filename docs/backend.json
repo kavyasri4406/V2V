@@ -76,6 +76,35 @@
         "message",
         "timestamp"
       ]
+    },
+    "Note": {
+      "title": "Note",
+      "description": "A to-do item or note for a user.",
+      "type": "object",
+      "properties": {
+        "title": {
+          "type": "string",
+          "description": "The title of the note."
+        },
+        "description": {
+          "type": "string",
+          "description": "The detailed description of the note."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "The timestamp when the note was created."
+        },
+        "completed": {
+          "type": "boolean",
+          "description": "Whether the note/task is completed."
+        },
+        "userId": {
+          "type": "string",
+          "description": "The ID of the user who owns the note."
+        }
+      },
+      "required": ["title", "createdAt", "completed", "userId"]
     }
   },
   "auth": {
@@ -113,6 +142,26 @@
             {
               "name": "userId",
               "description": "The user's unique ID from Firebase Authentication."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/users/{userId}/notes/{noteId}",
+        "definition": {
+          "entityName": "Note",
+          "schema": {
+            "$ref": "#/backend/entities/Note"
+          },
+          "description": "A collection of notes for each user.",
+          "params": [
+            {
+              "name": "userId",
+              "description": "The user's unique ID from Firebase Authentication."
+            },
+            {
+              "name": "noteId",
+              "description": "Unique identifier for the note."
             }
           ]
         }
