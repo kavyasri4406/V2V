@@ -9,7 +9,6 @@ import { AlertCard } from '@/components/alert-card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Users, AlertTriangle, Send, RadioTower } from 'lucide-react';
 import { useMemo } from 'react';
-import { WeatherCard } from '@/components/weather-card';
 
 export default function Home() {
   const firestore = useFirestore();
@@ -106,7 +105,6 @@ export default function Home() {
             </div>
             
             <div className="space-y-8">
-               <WeatherCard />
                 <Card className="animate-in fade-in-0 delay-300 duration-500">
                     <CardHeader>
                         <CardTitle>Network Overview</CardTitle>
