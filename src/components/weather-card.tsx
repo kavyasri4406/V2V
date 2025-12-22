@@ -1,10 +1,10 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { AlertTriangle, MapPin, RefreshCw, Wind, Droplets, Thermometer } from 'lucide-react';
+import { AlertTriangle, MapPin, RefreshCw, Wind, Droplets } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { getWeather, type GetWeatherOutput } from '@/ai/flows/get-weather-flow';
 import { useToast } from '@/hooks/use-toast';
@@ -15,7 +15,7 @@ type WeatherData = GetWeatherOutput & {
 };
 
 const CACHE_KEY = 'weatherData';
-const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
+const CACHE_DURATION = 10 * 60 * 1000; // 10 minutes
 
 export function WeatherCard() {
   const [weather, setWeather] = useState<WeatherData | null>(null);
@@ -40,7 +40,7 @@ export function WeatherCard() {
       }
     }
     
-    if (!navigator.geolocation) {
+    if (typeof navigator.geolocation === 'undefined') {
       setError('Geolocation is not supported by your browser.');
       setIsLoading(false);
       return;
@@ -48,6 +48,7 @@ export function WeatherCard() {
 
     navigator.geolocation.getCurrentPosition(
       async (position) => {
+        setPermissionStatus('granted');
         const { latitude, longitude } = position.coords;
         try {
           const weatherData = await getWeather({ latitude, longitude });
@@ -55,7 +56,7 @@ export function WeatherCard() {
           setWeather(newWeatherData);
           sessionStorage.setItem(CACHE_KEY, JSON.stringify(newWeatherData));
         } catch (e: any) {
-          setError('Could not fetch weather. The service may be temporarily unavailable.');
+          setError('Could not fetch weather. The AI service may be temporarily unavailable.');
           toast({
             variant: 'destructive',
             title: 'Weather Error',
@@ -66,7 +67,7 @@ export function WeatherCard() {
         }
       },
       (err) => {
-        setError(err.message);
+        setError('Please enable location access in your browser settings to see local weather.');
         setIsLoading(false);
         setPermissionStatus('denied');
       }
@@ -74,61 +75,37 @@ export function WeatherCard() {
   }, [toast]);
 
   useEffect(() => {
-    if (typeof window !== 'undefined' && navigator.geolocation) {
+    if (typeof window !== 'undefined' && navigator.permissions) {
       navigator.permissions.query({ name: 'geolocation' }).then((status) => {
         setPermissionStatus(status.state);
-        status.onchange = () => setPermissionStatus(status.state);
-
-        if (status.state === 'granted') {
-           handleGetWeather(false);
-        } else {
-            setIsLoading(false);
+        
+        // Only load from cache initially, don't fetch.
+        const cachedData = sessionStorage.getItem(CACHE_KEY);
+        if (cachedData) {
+            const parsed = JSON.parse(cachedData) as WeatherData;
+            if (Date.now() - parsed.timestamp < CACHE_DURATION) {
+                setWeather(parsed);
+            }
         }
+        setIsLoading(false);
+
+        status.onchange = () => {
+            setPermissionStatus(status.state);
+             // If permissions are granted, the user can now click the button
+            if (status.state !== 'granted') {
+                setWeather(null); // Clear weather if permissions are revoked
+            }
+        };
       });
     } else {
         setIsLoading(false);
         setError('Geolocation is not available.');
     }
-     const interval = setInterval(() => {
-      if (permissionStatus === 'granted') {
-        handleGetWeather(true); // Force refresh every 5 minutes
-      }
-    }, CACHE_DURATION);
-
-    return () => clearInterval(interval);
-  }, [permissionStatus, handleGetWeather]);
+  }, []);
 
   const renderContent = () => {
     if (isLoading) {
       return <WeatherSkeleton />;
-    }
-
-    if (error) {
-      return (
-        <div className="text-center text-destructive p-4 flex flex-col items-center gap-4">
-          <AlertTriangle className="w-8 h-8" />
-          <p className="font-semibold">Weather Unavailable</p>
-          <p className="text-sm">{error}</p>
-          {permissionStatus === 'denied' && (
-            <p className="text-xs text-muted-foreground">Please enable location access in your browser settings.</p>
-          )}
-           <Button onClick={() => handleGetWeather(true)} size="sm">
-            <RefreshCw className="mr-2 h-4 w-4" />
-            Try Again
-          </Button>
-        </div>
-      );
-    }
-    
-    if (permissionStatus !== 'granted') {
-         return (
-            <div className="text-center text-muted-foreground p-4 flex flex-col items-center gap-4">
-                <MapPin className="w-8 h-8" />
-                <p className="font-semibold">Location Access Needed</p>
-                <p className="text-sm">Enable location services to see local weather conditions.</p>
-                <Button onClick={() => handleGetWeather(true)} size="sm">Allow Access</Button>
-            </div>
-        )
     }
 
     if (weather) {
@@ -159,7 +136,39 @@ export function WeatherCard() {
       );
     }
 
-    return null;
+    if (error) {
+        return (
+          <div className="text-center text-destructive p-4 flex flex-col items-center gap-4">
+            <AlertTriangle className="w-8 h-8" />
+            <p className="font-semibold">Weather Unavailable</p>
+            <p className="text-sm">{error}</p>
+            <Button onClick={() => handleGetWeather(true)} size="sm">
+              <RefreshCw className="mr-2 h-4 w-4" />
+              Try Again
+            </Button>
+          </div>
+        );
+      }
+
+    if (permissionStatus !== 'granted') {
+         return (
+            <div className="text-center text-muted-foreground p-4 flex flex-col items-center gap-4">
+                <MapPin className="w-8 h-8" />
+                <p className="font-semibold">Location Access Needed</p>
+                <p className="text-sm">Enable location to see local weather.</p>
+                <Button onClick={() => handleGetWeather(false)} size="sm">Get Weather</Button>
+            </div>
+        )
+    }
+
+    return (
+        <div className="text-center text-muted-foreground p-4 flex flex-col items-center gap-4">
+            <MapPin className="w-8 h-8" />
+            <p className="font-semibold">Local Weather</p>
+            <p className="text-sm">Get the current weather conditions for your location.</p>
+            <Button onClick={() => handleGetWeather(false)} size="sm">Get Weather</Button>
+        </div>
+    );
   };
 
   return (
@@ -167,7 +176,7 @@ export function WeatherCard() {
       <CardHeader className="pb-2">
         <CardTitle className="flex items-center justify-between">
           <span>Weather</span>
-           <Button variant="ghost" size="icon" onClick={() => handleGetWeather(true)} disabled={isLoading || permissionStatus !== 'granted'}>
+           <Button variant="ghost" size="icon" onClick={() => handleGetWeather(true)} disabled={isLoading || !weather}>
             <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
             <span className="sr-only">Refresh Weather</span>
           </Button>
