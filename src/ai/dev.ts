@@ -1,1 +1,2 @@
-// Flows will be imported for their side effects in this file.
+'use server';
+import '@/ai/flows/get-weather-flow';
