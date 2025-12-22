@@ -65,7 +65,7 @@ export default function Home() {
     const mappedAlerts = allAlerts.map(alert => {
       const timestamp = alert.timestamp;
       const timestampMs = timestamp instanceof Timestamp ? timestamp.toMillis() : (typeof timestamp === 'number' ? timestamp : 0);
-      return { ...alert, timestamp: timestampMs, latitude: alert.latitude, longitude: alert.longitude };
+      return { ...alert, id: alert.id, timestamp: timestampMs, latitude: alert.latitude, longitude: alert.longitude };
     }).filter(alert => alert.timestamp > 0);
 
     if (locationEnabled && userLocation) {

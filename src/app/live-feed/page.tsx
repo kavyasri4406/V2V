@@ -48,7 +48,6 @@ export default function LiveAlertFeedPage() {
 
     if (storedLocation) {
       setFilterMode('local');
-      // No longer fetches location here. It will be received from the 'locationUpdated' event.
     }
 
     const handleLocationUpdate = (event: Event) => {

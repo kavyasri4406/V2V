@@ -14,7 +14,7 @@ import { WeatherIcon } from './weather-icon';
 type WeatherState =
   | { status: 'idle' }
   | { status: 'loading' }
-  | { status: 'success'; data: GetWeatherOutput }
+  | { status: 'success'; data: GetWeatherOutput & { latitude?: number, longitude?: number } }
   | { status: 'error'; message: string };
 
 const CACHE_KEY = 'weatherData';
@@ -39,6 +39,7 @@ export function WeatherCard() {
                 return; // Exit if valid cache found
             }
         } catch (e) {
+            console.error("Failed to parse weather cache", e);
             sessionStorage.removeItem(CACHE_KEY);
         }
     }

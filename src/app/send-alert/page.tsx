@@ -70,6 +70,15 @@ export default function SendAlertPage() {
   });
 
   const sendAlert = (alertData: any) => {
+    if (!firestore) {
+      toast({
+        variant: 'destructive',
+        title: 'Error',
+        description: 'Firestore is not available.',
+      });
+      setIsSubmitting(false);
+      return;
+    }
     const alertsRef = collection(firestore, 'alerts');
     addDoc(alertsRef, alertData)
       .then(() => {
