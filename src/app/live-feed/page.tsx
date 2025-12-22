@@ -50,31 +50,17 @@ export default function LiveAlertFeedPage() {
     const storedLocation = localStorage.getItem('locationEnabled') === 'true';
     setLocationEnabled(storedLocation);
 
-    if (storedLocation) {
-      setFilterMode('local');
+    const fetchLocation = () => {
       if (navigator.geolocation) {
         navigator.geolocation.getCurrentPosition(
-          async (position) => {
+          (position) => {
             const newLocation = {
               latitude: position.coords.latitude,
               longitude: position.coords.longitude,
             };
             setUserLocation(newLocation);
             setLocationError(null);
-            
-            // Fetch location name
-            setIsFetchingLocationName(true);
-            try {
-              const weatherData = await getWeather(newLocation);
-              setLocationName(weatherData.location);
-            } catch (e) {
-              // It's okay if this fails, we just won't show the name
-              console.error("Failed to fetch location name:", e);
-              setLocationName(null);
-            } finally {
-              setIsFetchingLocationName(false);
-            }
-
+            fetchLocationName(newLocation);
           },
           () => {
             setLocationError('Could not get location. Showing global alerts.');
@@ -82,11 +68,20 @@ export default function LiveAlertFeedPage() {
           }
         );
       }
+    };
+    
+    if (storedLocation) {
+      setFilterMode('local');
+      fetchLocation();
     }
 
     const handleLocationUpdate = (event: Event) => {
         const customEvent = event as CustomEvent;
-        setUserLocation(customEvent.detail);
+        const newLocation = customEvent.detail;
+        if(newLocation) {
+          setUserLocation(newLocation);
+          fetchLocationName(newLocation);
+        }
     };
 
     window.addEventListener('locationUpdated', handleLocationUpdate);
@@ -96,6 +91,19 @@ export default function LiveAlertFeedPage() {
     };
 
   }, []);
+
+  const fetchLocationName = async (location: { latitude: number; longitude: number; }) => {
+    setIsFetchingLocationName(true);
+    try {
+      const weatherData = await getWeather(location);
+      setLocationName(weatherData.location);
+    } catch (e) {
+      console.error("Failed to fetch location name on live feed:", e);
+      setLocationName(null); // It's okay if this fails, we just won't show the name
+    } finally {
+      setIsFetchingLocationName(false);
+    }
+  };
 
 
   const alertsQuery = useMemoFirebase(() => {
@@ -176,7 +184,7 @@ export default function LiveAlertFeedPage() {
       if (locationName) {
         return `Showing alerts within 5km of ${locationName}.`;
       }
-      return 'Showing alerts within 5km.';
+      return 'Showing alerts within 5km of your location.';
     }
     return 'Showing all alerts.';
   };
