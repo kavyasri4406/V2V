@@ -44,21 +44,20 @@ export function WeatherCard() {
         }
     }
 
-    // 2. Check geolocation permission status if no valid cache
+    // 2. If no valid cache, check permission status and go to idle state.
     if (navigator.permissions) {
       navigator.permissions.query({ name: 'geolocation' }).then((result) => {
         setPermissionState(result.state);
         if (result.state === 'denied') {
             setWeather({ status: 'error', message: 'Location permission denied.' });
         } else {
-            // No cached data and permission is not denied, so wait for user to click button.
             setWeather({ status: 'idle' });
         }
         result.onchange = () => {
             setPermissionState(result.state);
             if(result.state === 'denied') {
                 setWeather({ status: 'error', message: 'Location permission denied.' });
-                sessionStorage.removeItem(CACHE_KEY); // Clear cache if permission is revoked
+                sessionStorage.removeItem(CACHE_KEY);
             } else {
                  setWeather({ status: 'idle' });
             }
