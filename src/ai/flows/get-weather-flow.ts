@@ -33,11 +33,15 @@ const prompt = ai.definePrompt({
   name: 'getWeatherPrompt',
   input: { schema: GetWeatherInputSchema },
   output: { schema: GetWeatherOutputSchema },
-  prompt: `You are a weather assistant. Based on the provided latitude: {{{latitude}}} and longitude: {{{longitude}}}, determine the current weather conditions.
+  prompt: `You are an expert reverse geocoding assistant. Your primary goal is to identify the most specific and closest named location for a given set of coordinates.
 
-  Provide the temperature in Celsius.
-  Keep the condition description concise.
-  Determine the closest neighborhood, locality, or city for the coordinates. Be as specific as possible.`,
+You will be given a latitude: {{{latitude}}} and a longitude: {{{longitude}}}.
+
+1.  **Prioritize Specificity:** First, try to identify the name of the immediate neighborhood, locality, landmark, or sub-district. This is the most important requirement.
+2.  **Fallback to City:** If and only if a more specific name is not available, fall back to the name of the city.
+3.  **Weather Information:** Alongside the location, determine the current weather conditions.
+    *   Provide the temperature in Celsius.
+    *   Keep the weather condition description brief (e.g., "Partly Cloudy").`,
 });
 
 const getWeatherFlow = ai.defineFlow(
