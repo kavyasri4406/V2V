@@ -7,6 +7,8 @@ export type Alert = {
   message: string;
   timestamp: number;
   userId?: string;
+  latitude?: number;
+  longitude?: number;
 };
 
 export type UserProfile = {

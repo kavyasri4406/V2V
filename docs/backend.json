@@ -22,6 +22,14 @@
         "userId": {
           "type": "string",
           "description": "The ID of the user who created the alert."
+        },
+        "latitude": {
+            "type": "number",
+            "description": "The latitude where the alert was created."
+        },
+        "longitude": {
+            "type": "number",
+            "description": "The longitude where the alert was created."
         }
       },
       "required": [

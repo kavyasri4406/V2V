@@ -8,48 +8,90 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { AlertCard } from '@/components/alert-card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Users, AlertTriangle, Send, RadioTower } from 'lucide-react';
-import { useMemo } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { WeatherCard } from '@/components/weather-card';
 
+type LocationState = {
+    latitude: number;
+    longitude: number;
+} | null;
+
+// Haversine distance function
+const getDistance = (lat1: number, lon1: number, lat2: number, lon2: number): number => {
+    const R = 6371; // Radius of the Earth in km
+    const dLat = (lat2 - lat1) * (Math.PI / 180);
+    const dLon = (lon2 - lon1) * (Math.PI / 180);
+    const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) + Math.cos(lat1 * (Math.PI / 180)) * Math.cos(lat2 * (Math.PI / 180)) * Math.sin(dLon / 2) * Math.sin(dLon / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return R * c; // Distance in km
+}
 
 export default function Home() {
   const firestore = useFirestore();
+  const [userLocation, setUserLocation] = useState<LocationState>(null);
+  const [locationEnabled, setLocationEnabled] = useState(false);
+
+  useEffect(() => {
+    const storedLocation = localStorage.getItem('locationEnabled') === 'true';
+    setLocationEnabled(storedLocation);
+    if (storedLocation && navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition((position) => {
+            setUserLocation({
+                latitude: position.coords.latitude,
+                longitude: position.coords.longitude,
+            });
+        });
+    }
+  }, []);
 
   const alertsQuery = useMemoFirebase(() => {
     if (!firestore) return null;
-    return query(collection(firestore, 'alerts'), orderBy('timestamp', 'desc'), limit(50));
+    return query(collection(firestore, 'alerts'), orderBy('timestamp', 'desc'), limit(150));
   }, [firestore]);
 
-  const { data: alerts, isLoading } = useCollection<Omit<Alert, 'id' | 'timestamp'> & { timestamp: Timestamp | null }>(alertsQuery);
+  const { data: allAlerts, isLoading } = useCollection<Omit<Alert, 'id' | 'timestamp'> & { timestamp: Timestamp | null }>(alertsQuery);
 
   const processedAlerts = useMemo(() => {
-    if (!alerts) return [];
-    return alerts.map(alert => {
+    if (!allAlerts) return [];
+    
+    const mappedAlerts = allAlerts.map(alert => {
       const timestamp = alert.timestamp;
       const timestampMs = timestamp instanceof Timestamp ? timestamp.toMillis() : (typeof timestamp === 'number' ? timestamp : 0);
-      return { ...alert, timestamp: timestampMs };
-    }).filter(alert => alert.timestamp > 0) // Filter out alerts with invalid timestamps
-    .sort((a, b) => b.timestamp - a.timestamp);
-  }, [alerts]);
+      return { ...alert, timestamp: timestampMs, latitude: alert.latitude, longitude: alert.longitude };
+    }).filter(alert => alert.timestamp > 0);
+
+    if (locationEnabled && userLocation) {
+        return mappedAlerts.filter(alert => {
+            if (alert.latitude && alert.longitude) {
+                const distance = getDistance(userLocation.latitude, userLocation.longitude, alert.latitude, alert.longitude);
+                return distance <= 20; // 20km radius
+            }
+            // If location is enabled but alert has no coords, don't show it in local view.
+            return false;
+        }).sort((a, b) => b.timestamp - a.timestamp);
+    }
+
+    return mappedAlerts.sort((a, b) => b.timestamp - a.timestamp);
+  }, [allAlerts, locationEnabled, userLocation]);
+
 
   const latestAlert = useMemo(() => {
     return processedAlerts.length > 0 ? processedAlerts[0] : null;
   }, [processedAlerts]);
 
   const totalAlertsToday = useMemo(() => {
-    if (!alerts) return 0;
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     const todayTimestamp = today.getTime();
-
     return processedAlerts.filter(alert => alert.timestamp >= todayTimestamp).length;
   }, [processedAlerts]);
 
   const activeDrivers = useMemo(() => {
-    if (!alerts) return 0;
-    const uniqueDrivers = new Set(alerts.map(doc => doc.driver_name));
+    if (!allAlerts) return 0;
+    // Count drivers from all alerts to show total network activity
+    const uniqueDrivers = new Set(allAlerts.map(doc => doc.driver_name));
     return uniqueDrivers.size;
-  }, [alerts]);
+  }, [allAlerts]);
 
 
   return (
@@ -74,7 +116,7 @@ export default function Home() {
                 <Card className="h-full flex flex-col items-center justify-center text-center p-8 bg-accent/10 hover:bg-accent/20 cursor-pointer">
                     <RadioTower className="h-12 w-12 text-accent mb-4" />
                     <CardTitle className="text-2xl">View Live Feed</CardTitle>
-                    <CardDescription>See all active alerts from nearby drivers.</CardDescription>
+                    <CardDescription>See active alerts from nearby drivers.</CardDescription>
                 </Card>
             </Link>
           </div>
@@ -84,7 +126,7 @@ export default function Home() {
             <div className="lg:col-span-2 space-y-8">
                 <Card className="animate-in fade-in-0 delay-150 duration-500">
                   <CardHeader>
-                    <CardTitle>Latest Alert</CardTitle>
+                    <CardTitle>Latest Alert {locationEnabled && '(Nearby)'}</CardTitle>
                     <CardDescription>The most recent broadcast on the network.</CardDescription>
                   </CardHeader>
                   <CardContent>
@@ -99,7 +141,7 @@ export default function Home() {
                     ) : latestAlert ? (
                       <AlertCard alert={latestAlert} />
                     ) : (
-                      <div className="text-muted-foreground text-center py-8">No alerts on the network yet.</div>
+                      <div className="text-muted-foreground text-center py-8">{locationEnabled ? 'No nearby alerts.' : 'No alerts on the network yet.'}</div>
                     )}
                   </CardContent>
                 </Card>
@@ -118,7 +160,7 @@ export default function Home() {
                         </div>
                         <div>
                             <div className="text-2xl font-bold">{isLoading ? <Skeleton className="h-6 w-12" /> : totalAlertsToday}</div>
-                            <div className="text-sm text-muted-foreground">Alerts Today</div>
+                            <div className="text-sm text-muted-foreground">Alerts Today {locationEnabled && '(Nearby)'}</div>
                         </div>
                         </div>
                         <div className="flex items-center gap-4">
@@ -127,7 +169,7 @@ export default function Home() {
                         </div>
                         <div>
                             <div className="text-2xl font-bold">{isLoading ? <Skeleton className="h-6 w-12" /> : activeDrivers}</div>
-                            <div className="text-sm text-muted-foreground">Active Drivers</div>
+                            <div className="text-sm text-muted-foreground">Active Drivers {locationEnabled && '(Total)'}</div>
                         </div>
                         </div>
                     </CardContent>

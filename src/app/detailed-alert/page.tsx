@@ -41,7 +41,7 @@ const quickActions = [
   { name: 'Icy Conditions', icon: Snowflake },
   { name: 'Broken Down Vehicle', icon: ShieldAlert },
   { name: 'Road Closure', icon: XCircle },
-  { name: 'Police Activity', icon: Siren },
+  { name 'Police Activity', icon: Siren },
   { name: 'Fire', icon: Flame },
   { name: 'General Hazard', icon: TriangleAlert },
 ];
@@ -49,6 +49,7 @@ const quickActions = [
 export default function DetailedAlertPage() {
   const [submittingType, setSubmittingType] = useState<string | null>(null);
   const [voiceEnabled, setVoiceEnabled] = useState(false);
+  const [locationEnabled, setLocationEnabled] = useState(false);
   const firestore = useFirestore();
   const { toast } = useToast();
   const { user } = useUser();
@@ -62,19 +63,48 @@ export default function DetailedAlertPage() {
 
 
   useEffect(() => {
-    // This effect runs only on the client, avoiding hydration errors
-    const storedValue = localStorage.getItem('voiceAlertsEnabled') === 'true';
-    setVoiceEnabled(storedValue);
+    const storedVoice = localStorage.getItem('voiceAlertsEnabled') === 'true';
+    setVoiceEnabled(storedVoice);
+    const storedLocation = localStorage.getItem('locationEnabled') === 'true';
+    setLocationEnabled(storedLocation);
 
     const handleStorageChange = () => {
-        const updatedValue = localStorage.getItem('voiceAlertsEnabled') === 'true';
-        setVoiceEnabled(updatedValue);
+        const updatedVoice = localStorage.getItem('voiceAlertsEnabled') === 'true';
+        setVoiceEnabled(updatedVoice);
+        const updatedLocation = localStorage.getItem('locationEnabled') === 'true';
+        setLocationEnabled(updatedLocation);
     }
     window.addEventListener('storage', handleStorageChange);
     return () => {
       window.removeEventListener('storage', handleStorageChange);
     }
   }, []);
+
+  const sendAlert = (alertData: any) => {
+    const alertsRef = collection(firestore, 'alerts');
+    addDoc(alertsRef, alertData)
+      .then(() => {
+        toast({
+          title: 'Alert Sent!',
+          description: `"${alertData.message}" has been broadcasted.`,
+        });
+        if (voiceEnabled && 'speechSynthesis' in window) {
+            const utterance = new SpeechSynthesisUtterance(alertData.message);
+            window.speechSynthesis.speak(utterance);
+        }
+      })
+      .catch(() => {
+        const permissionError = new FirestorePermissionError({
+          path: alertsRef.path,
+          operation: 'create',
+          requestResourceData: alertData,
+        });
+        errorEmitter.emit('permission-error', permissionError);
+      })
+      .finally(() => {
+        setSubmittingType(null);
+      });
+  }
 
   const handleQuickAction = async (message: string) => {
     setSubmittingType(message);
@@ -88,8 +118,7 @@ export default function DetailedAlertPage() {
       return;
     }
 
-    const alertsRef = collection(firestore, 'alerts');
-    const newAlert = {
+    const baseAlert = {
       driver_name: userProfile?.driverName || 'Anonymous',
       sender_vehicle: userProfile?.vehicleNumber || 'N/A',
       message: message,
@@ -97,29 +126,24 @@ export default function DetailedAlertPage() {
       userId: user.uid,
     };
 
-    addDoc(alertsRef, newAlert)
-      .then(() => {
-        toast({
-          title: 'Alert Sent!',
-          description: `"${message}" has been broadcasted.`,
-        });
-        if (voiceEnabled && 'speechSynthesis' in window) {
-            const utterance = new SpeechSynthesisUtterance(message);
-            window.speechSynthesis.speak(utterance);
-        }
-      })
-      .catch(() => {
-        const permissionError = new FirestorePermissionError({
-          path: alertsRef.path,
-          operation: 'create',
-          requestResourceData: newAlert,
-        });
-        errorEmitter.emit('permission-error', permissionError);
-        // The global error handler will show the error, no need for a toast here
-      })
-      .finally(() => {
-        setSubmittingType(null);
-      });
+    if (locationEnabled && navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+            (position) => {
+                const { latitude, longitude } = position.coords;
+                sendAlert({ ...baseAlert, latitude, longitude });
+            },
+            () => {
+                toast({
+                    variant: 'destructive',
+                    title: 'Location Error',
+                    description: 'Could not get location. Alert sent without it.',
+                });
+                sendAlert(baseAlert);
+            }
+        );
+    } else {
+        sendAlert(baseAlert);
+    }
   };
 
   return (
@@ -128,7 +152,7 @@ export default function DetailedAlertPage() {
               <CardHeader>
                   <CardTitle>Quick Alert</CardTitle>
                   <CardDescription>
-                      Send an instant alert with one tap. Your driver profile information will be used.
+                      Send an instant alert with one tap. If enabled, your location will be attached.
                   </CardDescription>
               </CardHeader>
               <CardContent className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
