@@ -8,53 +8,14 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { AlertCard } from '@/components/alert-card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Users, AlertTriangle, Send, RadioTower } from 'lucide-react';
-import { useMemo, useState, useEffect } from 'react';
-import { WeatherCard } from '@/components/weather-card';
-import { getDistance } from '@/lib/utils';
-
-
-type LocationState = {
-    latitude: number;
-    longitude: number;
-} | null;
+import { useMemo } from 'react';
 
 export default function Home() {
   const firestore = useFirestore();
-  const [userLocation, setUserLocation] = useState<LocationState>(null);
-  const [locationEnabled, setLocationEnabled] = useState(false);
-
-  useEffect(() => {
-    const storedLocation = localStorage.getItem('locationEnabled') === 'true';
-    setLocationEnabled(storedLocation);
-
-    const handleLocationUpdate = (event: Event) => {
-        const customEvent = event as CustomEvent;
-        if(customEvent.detail) {
-          setUserLocation(customEvent.detail);
-        }
-    };
-    
-    const handleStorageChange = () => {
-        const updatedLocation = localStorage.getItem('locationEnabled') === 'true';
-        setLocationEnabled(updatedLocation);
-        if (!updatedLocation) {
-            setUserLocation(null);
-        }
-    }
-
-    window.addEventListener('locationUpdated', handleLocationUpdate);
-    window.addEventListener('storage', handleStorageChange);
-
-    return () => {
-        window.removeEventListener('locationUpdated', handleLocationUpdate);
-        window.removeEventListener('storage', handleStorageChange);
-    };
-
-  }, []);
 
   const alertsQuery = useMemoFirebase(() => {
     if (!firestore) return null;
-    return query(collection(firestore, 'alerts'), orderBy('timestamp', 'desc'), limit(150));
+    return query(collection(firestore, 'alerts'), orderBy('timestamp', 'desc'), limit(50));
   }, [firestore]);
 
   const { data: allAlerts, isLoading } = useCollection<Omit<Alert, 'id' | 'timestamp'> & { timestamp: Timestamp | null }>(alertsQuery);
@@ -62,25 +23,13 @@ export default function Home() {
   const processedAlerts = useMemo(() => {
     if (!allAlerts) return [];
     
-    const mappedAlerts = allAlerts.map(alert => {
+    return allAlerts.map(alert => {
       const timestamp = alert.timestamp;
       const timestampMs = timestamp instanceof Timestamp ? timestamp.toMillis() : (typeof timestamp === 'number' ? timestamp : 0);
       return { ...alert, id: alert.id, timestamp: timestampMs, latitude: alert.latitude, longitude: alert.longitude };
-    }).filter(alert => alert.timestamp > 0);
-
-    if (locationEnabled && userLocation) {
-        return mappedAlerts.filter(alert => {
-            if (alert.latitude && alert.longitude) {
-                const distance = getDistance(userLocation.latitude, userLocation.longitude, alert.latitude, alert.longitude);
-                return distance <= 5; // 5km radius
-            }
-            // If location is enabled but alert has no coords, don't show it in local view.
-            return false;
-        }).sort((a, b) => b.timestamp - a.timestamp);
-    }
-
-    return mappedAlerts.sort((a, b) => b.timestamp - a.timestamp);
-  }, [allAlerts, locationEnabled, userLocation]);
+    }).filter(alert => alert.timestamp > 0)
+      .sort((a, b) => b.timestamp - a.timestamp);
+  }, [allAlerts]);
 
 
   const latestAlert = useMemo(() => {
@@ -124,7 +73,7 @@ export default function Home() {
                 <Card className="h-full flex flex-col items-center justify-center text-center p-8 bg-accent/10 hover:bg-accent/20 cursor-pointer">
                     <RadioTower className="h-12 w-12 text-accent mb-4" />
                     <CardTitle className="text-2xl">View Live Feed</CardTitle>
-                    <CardDescription>See active alerts from nearby drivers.</CardDescription>
+                    <CardDescription>See active alerts from drivers.</CardDescription>
                 </Card>
             </Link>
           </div>
@@ -134,7 +83,7 @@ export default function Home() {
             <div className="lg:col-span-2 space-y-8">
                 <Card className="animate-in fade-in-0 delay-150 duration-500">
                   <CardHeader>
-                    <CardTitle>Latest Alert {locationEnabled && '(Nearby)'}</CardTitle>
+                    <CardTitle>Latest Alert</CardTitle>
                     <CardDescription>The most recent broadcast on the network.</CardDescription>
                   </CardHeader>
                   <CardContent>
@@ -147,16 +96,15 @@ export default function Home() {
                           </div>
                         </div>
                     ) : latestAlert ? (
-                      <AlertCard alert={latestAlert} userLocation={userLocation} />
+                      <AlertCard alert={latestAlert} />
                     ) : (
-                      <div className="text-muted-foreground text-center py-8">{locationEnabled ? 'No nearby alerts.' : 'No alerts on the network yet.'}</div>
+                      <div className="text-muted-foreground text-center py-8">No alerts on the network yet.</div>
                     )}
                   </CardContent>
                 </Card>
             </div>
             
             <div className="space-y-8">
-                <WeatherCard />
                 <Card className="animate-in fade-in-0 delay-300 duration-500">
                     <CardHeader>
                         <CardTitle>Network Overview</CardTitle>
@@ -168,7 +116,7 @@ export default function Home() {
                         </div>
                         <div>
                             <div className="text-2xl font-bold">{isLoading ? <Skeleton className="h-6 w-12" /> : totalAlertsToday}</div>
-                            <div className="text-sm text-muted-foreground">Alerts Today {locationEnabled && '(Nearby)'}</div>
+                            <div className="text-sm text-muted-foreground">Alerts Today</div>
                         </div>
                         </div>
                         <div className="flex items-center gap-4">
@@ -177,7 +125,7 @@ export default function Home() {
                         </div>
                         <div>
                             <div className="text-2xl font-bold">{isLoading ? <Skeleton className="h-6 w-12" /> : activeDrivers}</div>
-                            <div className="text-sm text-muted-foreground">Active Drivers {locationEnabled && '(Total)'}</div>
+                            <div className="text-sm text-muted-foreground">Active Drivers</div>
                         </div>
                         </div>
                     </CardContent>

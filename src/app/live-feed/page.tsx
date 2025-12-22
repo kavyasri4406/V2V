@@ -18,7 +18,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
-import { Trash2, Loader2, LocateFixed, Globe } from 'lucide-react';
+import { Trash2, Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import {
   Tooltip,
@@ -26,57 +26,12 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { getDistance } from '@/lib/utils';
 
-
-type LocationState = {
-    latitude: number;
-    longitude: number;
-} | null;
 
 export default function LiveAlertFeedPage() {
   const firestore = useFirestore();
   const { toast } = useToast();
   const [isDeleting, setIsDeleting] = useState(false);
-  const [userLocation, setUserLocation] = useState<LocationState>(null);
-  const [filterMode, setFilterMode] = useState<'local' | 'global'>('global');
-  const [locationEnabled, setLocationEnabled] = useState(false);
-
-  useEffect(() => {
-    const storedLocation = localStorage.getItem('locationEnabled') === 'true';
-    setLocationEnabled(storedLocation);
-
-    if (storedLocation) {
-      setFilterMode('local');
-    }
-
-    const handleLocationUpdate = (event: Event) => {
-        const customEvent = event as CustomEvent;
-        if(customEvent.detail) {
-          setUserLocation(customEvent.detail);
-        }
-    };
-
-    const handleStorageChange = () => {
-        const updatedLocation = localStorage.getItem('locationEnabled') === 'true';
-        setLocationEnabled(updatedLocation);
-        if (updatedLocation) {
-            setFilterMode('local');
-        } else {
-            setFilterMode('global');
-            setUserLocation(null);
-        }
-    }
-
-    window.addEventListener('locationUpdated', handleLocationUpdate);
-    window.addEventListener('storage', handleStorageChange);
-
-    return () => {
-        window.removeEventListener('locationUpdated', handleLocationUpdate);
-        window.removeEventListener('storage', handleStorageChange);
-    };
-
-  }, []);
 
   const alertsQuery = useMemoFirebase(() => {
     if (!firestore) return null;
@@ -89,7 +44,7 @@ export default function LiveAlertFeedPage() {
   const processedAlerts = useMemo(() => {
     if (!allAlerts) return [];
     
-    const mappedAlerts = allAlerts.map(doc => {
+    return allAlerts.map(doc => {
        const timestamp = doc.timestamp;
        const timestampMs = timestamp instanceof Timestamp ? timestamp.toMillis() : Date.now();
       return {
@@ -97,21 +52,9 @@ export default function LiveAlertFeedPage() {
         id: doc.id,
         timestamp: timestampMs,
       };
-    });
+    }).sort((a, b) => b.timestamp - a.timestamp);
 
-    if (filterMode === 'local' && userLocation) {
-        return mappedAlerts.filter(alert => {
-            if (alert.latitude && alert.longitude) {
-                const distance = getDistance(userLocation.latitude, userLocation.longitude, alert.latitude, alert.longitude);
-                return distance <= 5; // 5km radius
-            }
-            return false;
-        }).sort((a, b) => b.timestamp - a.timestamp);
-    }
-
-    return mappedAlerts.sort((a, b) => b.timestamp - a.timestamp);
-
-  }, [allAlerts, filterMode, userLocation]);
+  }, [allAlerts]);
 
   const handleClearAlerts = async () => {
     if (!firestore) return;
@@ -143,18 +86,6 @@ export default function LiveAlertFeedPage() {
       })
       .finally(() => setIsDeleting(false));
   };
-  
-  const toggleFilterMode = () => {
-      setFilterMode(current => current === 'local' ? 'global' : 'local');
-  }
-
-  const getFeedDescription = () => {
-    if (filterMode === 'local' && locationEnabled) {
-      return 'Showing alerts within 5km of your location.';
-    }
-    return 'Showing all alerts.';
-  };
-
 
   return (
       <div className="w-full max-w-4xl mx-auto">
@@ -163,25 +94,10 @@ export default function LiveAlertFeedPage() {
               <div className="flex-1">
                   <CardTitle>Live Alert Feed</CardTitle>
                   <CardDescription>
-                    {getFeedDescription()}
+                    Showing all recent alerts from drivers on the network.
                   </CardDescription>
               </div>
               <div className="flex items-center gap-2">
-                {locationEnabled && (
-                    <TooltipProvider>
-                        <Tooltip>
-                            <TooltipTrigger asChild>
-                                 <Button variant="outline" size="icon" onClick={toggleFilterMode} disabled={!userLocation && filterMode === 'global'}>
-                                    {filterMode === 'local' ? <LocateFixed className="h-4 w-4 text-primary" /> : <Globe className="h-4 w-4" />}
-                                    <span className="sr-only">Toggle between local and global alerts</span>
-                                </Button>
-                            </TooltipTrigger>
-                            <TooltipContent>
-                                <p>{filterMode === 'local' ? 'Show Global Alerts' : 'Show Local Alerts'}</p>
-                            </TooltipContent>
-                        </Tooltip>
-                    </TooltipProvider>
-                )}
                 <AlertDialog>
                   <TooltipProvider>
                     <Tooltip>
@@ -230,10 +146,10 @@ export default function LiveAlertFeedPage() {
                       </div>
                   ))
               ) : processedAlerts.length > 0 ? (
-                  processedAlerts.map((alert) => <AlertCard key={alert.id} alert={alert} userLocation={userLocation} />)
+                  processedAlerts.map((alert) => <AlertCard key={alert.id} alert={alert} />)
               ) : (
                   <p className="text-muted-foreground text-center py-8">
-                  {filterMode === 'local' ? 'No alerts in your area.' : 'No recent alerts to display.'}
+                    No recent alerts to display.
                   </p>
               )}
               </div>
