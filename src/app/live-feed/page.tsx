@@ -17,7 +17,6 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-  AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
 import { Trash2, Loader2, LocateFixed, Globe } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
@@ -70,6 +69,7 @@ export default function LiveAlertFeedPage() {
               setLocationName(weatherData.location);
             } catch (e) {
               // It's okay if this fails, we just won't show the name
+              console.error("Failed to fetch location name:", e);
               setLocationName(null);
             } finally {
               setIsFetchingLocationName(false);
