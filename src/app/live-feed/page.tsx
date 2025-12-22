@@ -83,6 +83,18 @@ export default function LiveAlertFeedPage() {
         );
       }
     }
+
+    const handleLocationUpdate = (event: Event) => {
+        const customEvent = event as CustomEvent;
+        setUserLocation(customEvent.detail);
+    };
+
+    window.addEventListener('locationUpdated', handleLocationUpdate);
+
+    return () => {
+        window.removeEventListener('locationUpdated', handleLocationUpdate);
+    };
+
   }, []);
 
 

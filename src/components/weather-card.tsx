@@ -8,7 +8,7 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
-import { MapPin, Loader2, AlertTriangle } from 'lucide-react';
+import { MapPin, Loader2, AlertTriangle, RefreshCw } from 'lucide-react';
 import { WeatherIcon } from './weather-icon';
 
 type WeatherState =
@@ -51,6 +51,9 @@ export function WeatherCard() {
           const { latitude, longitude } = position.coords;
           const weatherData = await getWeather({ latitude, longitude });
           setWeather({ status: 'success', data: weatherData });
+           // Dispatch a custom event to notify other components of location update
+          window.dispatchEvent(new CustomEvent('locationUpdated', { detail: { latitude, longitude } }));
+
         } catch (error) {
           console.error('Weather fetching error:', error);
           setWeather({
@@ -115,14 +118,18 @@ export function WeatherCard() {
       case 'success':
         const { data } = weather;
         return (
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-4 w-full">
             <WeatherIcon condition={data.condition} className="h-10 w-10 text-primary" />
-            <div>
+            <div className="flex-1">
               <div className="text-3xl font-bold">
                 {Math.round(data.temperature)}&deg;C
               </div>
-              <div className="text-sm text-muted-foreground">{data.location}</div>
+              <div className="text-sm text-muted-foreground truncate">{data.location}</div>
             </div>
+            <Button variant="ghost" size="icon" onClick={handleGetWeather} className="shrink-0">
+                <RefreshCw className="h-4 w-4 text-muted-foreground" />
+                <span className="sr-only">Recheck Location</span>
+            </Button>
           </div>
         );
     }
