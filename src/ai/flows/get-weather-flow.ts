@@ -37,7 +37,7 @@ const prompt = ai.definePrompt({
 
   Provide the temperature in Celsius.
   Keep the condition description concise.
-  Determine the city or locality for the coordinates.`,
+  Determine the closest neighborhood, locality, or city for the coordinates. Be as specific as possible.`,
 });
 
 const getWeatherFlow = ai.defineFlow(
