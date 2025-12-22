@@ -105,6 +105,11 @@ export function WeatherCard() {
                 Please enable location access in your browser settings.
               </p>
             )}
+            {!permissionDenied && (
+              <Button variant="outline" size="sm" className="mt-4" onClick={handleGetWeather}>
+                Try Again
+              </Button>
+            )}
           </div>
         );
       case 'success':
