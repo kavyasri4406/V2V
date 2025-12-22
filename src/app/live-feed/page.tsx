@@ -1,8 +1,8 @@
 'use client';
 
 import { useMemo, useState, useEffect } from 'react';
-import { collection, query, orderBy, limit, Timestamp, getDocs, writeBatch, where, GeoPoint } from 'firebase/firestore';
-import { useCollection, useFirestore, useMemoFirebase, errorEmitter, FirestorePermissionError } from '@/firebase';
+import { collection, query, orderBy, limit, Timestamp, getDocs, writeBatch } from 'firebase/firestore';
+import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
 import type { Alert } from '@/lib/types';
 import { AlertCard } from '@/components/alert-card';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -26,109 +26,10 @@ import {
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
-} from "@/components/ui/tooltip"
+} from "@/components/ui/tooltip";
+import { getWeather, type GetWeatherOutput } from '@/ai/flows/get-weather-flow';
+import { getDistance } from '@/lib/utils';
 
-// Geohash calculations
-const BASE32 = '0123456789bcdefghjkmnpqrstuvwxyz';
-
-const encodeGeohash = (latitude: number, longitude: number, precision: number): string => {
-  let isEven = true;
-  let latRange = [-90, 90];
-  let lonRange = [-180, 180];
-  let geohash = '';
-  let bit = 0;
-  let ch = 0;
-
-  while (geohash.length < precision) {
-    if (isEven) {
-      const mid = (lonRange[0] + lonRange[1]) / 2;
-      if (longitude > mid) {
-        ch |= (1 << (4 - bit));
-        lonRange[0] = mid;
-      } else {
-        lonRange[1] = mid;
-      }
-    } else {
-      const mid = (latRange[0] + latRange[1]) / 2;
-      if (latitude > mid) {
-        ch |= (1 << (4 - bit));
-        latRange[0] = mid;
-      } else {
-        latRange[1] = mid;
-      }
-    }
-    isEven = !isEven;
-
-    if (bit < 4) {
-      bit++;
-    } else {
-      geohash += BASE32[ch];
-      bit = 0;
-      ch = 0;
-    }
-  }
-  return geohash;
-};
-
-const getNeighbors = (geohash: string): string[] => {
-  const neighbors: { [key: string]: string[] } = {
-    right: 'p0r21436x8zb9dcf5h7kjnmqesgutwvy',
-    left: '14365h7k9dcfesgujnmqp0r2twvyx8zb',
-    top: 'bcdefghjkmnpqrstuvwxyz0123456789',
-    bottom: '23456789bcdefghjkmnpqrstuvwxyz',
-  };
-  const borders: { [key: string]: string[] } = {
-    right: 'bcfguvyz',
-    left: '0145hjnp',
-    top: 'prxz',
-    bottom: '028b',
-  };
-
-  const lastCh = geohash.slice(-1);
-  const parent = geohash.slice(0, -1);
-  const type = geohash.length % 2 ? 'odd' : 'even';
-
-  const getBorder = (hash: string, dir: 'right' | 'left' | 'top' | 'bottom'): string => {
-    if (hash.length === 0) return '';
-    const last = hash.slice(-1);
-    const p = hash.slice(0, -1);
-    return borders[dir].includes(last) ? getBorder(p, dir) + BASE32[neighbors[dir].indexOf(last)] : p + BASE32[neighbors[dir].indexOf(last)];
-  };
-
-  const adjacent = (dir: 'right' | 'left' | 'top' | 'bottom'): string => {
-    const border = borders[dir].includes(lastCh);
-    if (border && parent !== '') {
-      return getBorder(parent, dir) + BASE32[neighbors[dir].indexOf(lastCh)];
-    }
-    return parent + BASE32[neighbors[dir].indexOf(lastCh)];
-  };
-
-  const result: string[] = [
-    adjacent('top'),
-    adjacent('bottom'),
-    adjacent('right'),
-    adjacent('left'),
-  ];
-
-  const diag = (d1: 'top' | 'bottom', d2: 'right' | 'left') => {
-      const g1 = adjacent(d1);
-      return adjacent.call({geohash: g1, parent: g1.slice(0,-1), lastCh: g1.slice(-1)}, d2)
-  };
-
-  result.push(diag('top', 'right'), diag('top', 'left'), diag('bottom', 'right'), diag('bottom', 'left'));
-  return result;
-};
-
-
-// Haversine distance
-const getDistance = (lat1: number, lon1: number, lat2: number, lon2: number): number => {
-    const R = 6371; // Radius of the Earth in km
-    const dLat = (lat2 - lat1) * (Math.PI / 180);
-    const dLon = (lon2 - lon1) * (Math.PI / 180);
-    const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) + Math.cos(lat1 * (Math.PI / 180)) * Math.cos(lat2 * (Math.PI / 180)) * Math.sin(dLon / 2) * Math.sin(dLon / 2);
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-    return R * c; // Distance in km
-}
 
 type LocationState = {
     latitude: number;
@@ -143,6 +44,8 @@ export default function LiveAlertFeedPage() {
   const [locationError, setLocationError] = useState<string | null>(null);
   const [filterMode, setFilterMode] = useState<'local' | 'global'>('global');
   const [locationEnabled, setLocationEnabled] = useState(false);
+  const [locationName, setLocationName] = useState<string | null>(null);
+  const [isFetchingLocationName, setIsFetchingLocationName] = useState(false);
 
   useEffect(() => {
     const storedLocation = localStorage.getItem('locationEnabled') === 'true';
@@ -152,12 +55,26 @@ export default function LiveAlertFeedPage() {
       setFilterMode('local');
       if (navigator.geolocation) {
         navigator.geolocation.getCurrentPosition(
-          (position) => {
-            setUserLocation({
+          async (position) => {
+            const newLocation = {
               latitude: position.coords.latitude,
               longitude: position.coords.longitude,
-            });
+            };
+            setUserLocation(newLocation);
             setLocationError(null);
+            
+            // Fetch location name
+            setIsFetchingLocationName(true);
+            try {
+              const weatherData = await getWeather(newLocation);
+              setLocationName(weatherData.location);
+            } catch (e) {
+              // It's okay if this fails, we just won't show the name
+              setLocationName(null);
+            } finally {
+              setIsFetchingLocationName(false);
+            }
+
           },
           () => {
             setLocationError('Could not get location. Showing global alerts.');
@@ -210,12 +127,7 @@ export default function LiveAlertFeedPage() {
 
     const alertsRef = collection(firestore, 'alerts');
     
-    const querySnapshot = await getDocs(alertsRef).catch((error) => {
-        const permissionError = new FirestorePermissionError({ path: alertsRef.path, operation: 'list' });
-        errorEmitter.emit('permission-error', permissionError);
-        setIsDeleting(false);
-        return null;
-    });
+    const querySnapshot = await getDocs(alertsRef);
 
     if (!querySnapshot) return;
     
@@ -228,11 +140,14 @@ export default function LiveAlertFeedPage() {
     const batch = writeBatch(firestore);
     querySnapshot.forEach((doc) => batch.delete(doc.ref));
 
-    batch.commit()
+    await batch.commit()
       .then(() => toast({ title: 'Success!', description: 'All alerts cleared.' }))
-      .catch(() => {
-        const permissionError = new FirestorePermissionError({ path: alertsRef.path, operation: 'delete' });
-        errorEmitter.emit('permission-error', permissionError);
+      .catch((err) => {
+        toast({
+            variant: 'destructive',
+            title: 'Error',
+            description: 'Could not clear alerts.',
+        });
       })
       .finally(() => setIsDeleting(false));
   };
@@ -241,6 +156,20 @@ export default function LiveAlertFeedPage() {
       setFilterMode(current => current === 'local' ? 'global' : 'local');
   }
 
+  const getFeedDescription = () => {
+    if (filterMode === 'local' && locationEnabled) {
+      if (isFetchingLocationName) {
+        return 'Finding your location...';
+      }
+      if (locationName) {
+        return `Showing alerts within 20km of ${locationName}.`;
+      }
+      return 'Showing alerts within 20km.';
+    }
+    return 'Showing all alerts.';
+  };
+
+
   return (
       <div className="w-full max-w-4xl mx-auto">
           <Card className="h-full">
@@ -248,7 +177,7 @@ export default function LiveAlertFeedPage() {
               <div className="flex-1">
                   <CardTitle>Live Alert Feed</CardTitle>
                   <CardDescription>
-                    {filterMode === 'local' && locationEnabled ? 'Showing alerts within 20km.' : 'Showing all alerts.'}
+                    {getFeedDescription()}
                     {locationError && <span className="text-destructive"> {locationError}</span>}
                   </CardDescription>
               </div>
@@ -316,7 +245,7 @@ export default function LiveAlertFeedPage() {
                       </div>
                   ))
               ) : processedAlerts.length > 0 ? (
-                  processedAlerts.map((alert) => <AlertCard key={alert.id} alert={alert} />)
+                  processedAlerts.map((alert) => <AlertCard key={alert.id} alert={alert} userLocation={userLocation} />)
               ) : (
                   <p className="text-muted-foreground text-center py-8">
                   {filterMode === 'local' ? 'No alerts in your area.' : 'No recent alerts to display.'}
