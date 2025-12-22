@@ -36,6 +36,13 @@ export function WeatherIcon({
   condition,
   ...props
 }: { condition: string } & LucideProps) {
-  const Icon = iconMap[condition] || iconMap.default;
+  let bestMatch: React.ElementType = iconMap.default;
+  for (const key in iconMap) {
+    if (condition.toLowerCase().includes(key.toLowerCase())) {
+        bestMatch = iconMap[key];
+        break;
+    }
+  }
+  const Icon = bestMatch;
   return <Icon {...props} />;
 }
