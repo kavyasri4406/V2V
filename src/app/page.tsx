@@ -26,24 +26,28 @@ export default function Home() {
   useEffect(() => {
     const storedLocation = localStorage.getItem('locationEnabled') === 'true';
     setLocationEnabled(storedLocation);
-    if (storedLocation && navigator.geolocation) {
-        navigator.geolocation.getCurrentPosition((position) => {
-            setUserLocation({
-                latitude: position.coords.latitude,
-                longitude: position.coords.longitude,
-            });
-        });
-    }
 
     const handleLocationUpdate = (event: Event) => {
         const customEvent = event as CustomEvent;
-        setUserLocation(customEvent.detail);
+        if(customEvent.detail) {
+          setUserLocation(customEvent.detail);
+        }
     };
+    
+    const handleStorageChange = () => {
+        const updatedLocation = localStorage.getItem('locationEnabled') === 'true';
+        setLocationEnabled(updatedLocation);
+        if (!updatedLocation) {
+            setUserLocation(null);
+        }
+    }
 
     window.addEventListener('locationUpdated', handleLocationUpdate);
+    window.addEventListener('storage', handleStorageChange);
 
     return () => {
         window.removeEventListener('locationUpdated', handleLocationUpdate);
+        window.removeEventListener('storage', handleStorageChange);
     };
 
   }, []);

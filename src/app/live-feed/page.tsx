@@ -26,7 +26,6 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { getWeather, type GetWeatherOutput } from '@/ai/flows/get-weather-flow';
 import { getDistance } from '@/lib/utils';
 
 
@@ -40,71 +39,45 @@ export default function LiveAlertFeedPage() {
   const { toast } = useToast();
   const [isDeleting, setIsDeleting] = useState(false);
   const [userLocation, setUserLocation] = useState<LocationState>(null);
-  const [locationError, setLocationError] = useState<string | null>(null);
   const [filterMode, setFilterMode] = useState<'local' | 'global'>('global');
   const [locationEnabled, setLocationEnabled] = useState(false);
-  const [locationName, setLocationName] = useState<string | null>(null);
-  const [isFetchingLocationName, setIsFetchingLocationName] = useState(false);
 
   useEffect(() => {
     const storedLocation = localStorage.getItem('locationEnabled') === 'true';
     setLocationEnabled(storedLocation);
 
-    const fetchLocation = () => {
-      if (navigator.geolocation) {
-        navigator.geolocation.getCurrentPosition(
-          (position) => {
-            const newLocation = {
-              latitude: position.coords.latitude,
-              longitude: position.coords.longitude,
-            };
-            setUserLocation(newLocation);
-            setLocationError(null);
-            fetchLocationName(newLocation);
-          },
-          () => {
-            setLocationError('Could not get location. Showing global alerts.');
-            setFilterMode('global');
-          }
-        );
-      }
-    };
-    
     if (storedLocation) {
       setFilterMode('local');
-      fetchLocation();
+      // No longer fetches location here. It will be received from the 'locationUpdated' event.
     }
 
     const handleLocationUpdate = (event: Event) => {
         const customEvent = event as CustomEvent;
-        const newLocation = customEvent.detail;
-        if(newLocation) {
-          setUserLocation(newLocation);
-          fetchLocationName(newLocation);
+        if(customEvent.detail) {
+          setUserLocation(customEvent.detail);
         }
     };
 
+    const handleStorageChange = () => {
+        const updatedLocation = localStorage.getItem('locationEnabled') === 'true';
+        setLocationEnabled(updatedLocation);
+        if (updatedLocation) {
+            setFilterMode('local');
+        } else {
+            setFilterMode('global');
+            setUserLocation(null);
+        }
+    }
+
     window.addEventListener('locationUpdated', handleLocationUpdate);
+    window.addEventListener('storage', handleStorageChange);
 
     return () => {
         window.removeEventListener('locationUpdated', handleLocationUpdate);
+        window.removeEventListener('storage', handleStorageChange);
     };
 
   }, []);
-
-  const fetchLocationName = async (location: { latitude: number; longitude: number; }) => {
-    setIsFetchingLocationName(true);
-    try {
-      const weatherData = await getWeather(location);
-      setLocationName(weatherData.location);
-    } catch (e) {
-      console.error("Failed to fetch location name on live feed:", e);
-      setLocationName(null); // It's okay if this fails, we just won't show the name
-    } finally {
-      setIsFetchingLocationName(false);
-    }
-  };
-
 
   const alertsQuery = useMemoFirebase(() => {
     if (!firestore) return null;
@@ -178,12 +151,6 @@ export default function LiveAlertFeedPage() {
 
   const getFeedDescription = () => {
     if (filterMode === 'local' && locationEnabled) {
-      if (isFetchingLocationName) {
-        return 'Finding your location...';
-      }
-      if (locationName) {
-        return `Showing alerts within 5km of ${locationName}.`;
-      }
       return 'Showing alerts within 5km of your location.';
     }
     return 'Showing all alerts.';
@@ -198,7 +165,6 @@ export default function LiveAlertFeedPage() {
                   <CardTitle>Live Alert Feed</CardTitle>
                   <CardDescription>
                     {getFeedDescription()}
-                    {locationError && <span className="text-destructive"> {locationError}</span>}
                   </CardDescription>
               </div>
               <div className="flex items-center gap-2">
