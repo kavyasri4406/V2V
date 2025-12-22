@@ -13,6 +13,7 @@ import { WeatherIcon } from './weather-icon';
 
 type WeatherState =
   | { status: 'idle' }
+  | { status: 'prompt_permission' }
   | { status: 'loading' }
   | { status: 'success'; data: GetWeatherOutput }
   | { status: 'error'; message: string };
@@ -22,9 +23,10 @@ const CACHE_DURATION = 10 * 60 * 1000; // 10 minutes
 
 export function WeatherCard() {
   const [weather, setWeather] = useState<WeatherState>({ status: 'idle' });
-  const [permissionDenied, setPermissionDenied] = useState(false);
+  const [permissionState, setPermissionState] = useState<'prompt' | 'granted' | 'denied'>('prompt');
 
   useEffect(() => {
+    // 1. Check for cached data first
     const cachedData = sessionStorage.getItem(CACHE_KEY);
     if (cachedData) {
         try {
@@ -41,17 +43,27 @@ export function WeatherCard() {
         }
     }
 
+    // 2. Check geolocation permission status
     if (navigator.permissions) {
       navigator.permissions.query({ name: 'geolocation' }).then((result) => {
+        setPermissionState(result.state);
         if (result.state === 'denied') {
-          setPermissionDenied(true);
-          setWeather({ status: 'error', message: 'Location permission denied.' });
-        } else if (result.state === 'granted') {
-          handleGetWeather();
+            setWeather({ status: 'error', message: 'Location permission denied.' });
+        } else {
+            setWeather({ status: 'idle' });
         }
+        result.onchange = () => {
+            setPermissionState(result.state);
+            if(result.state === 'denied') {
+                setWeather({ status: 'error', message: 'Location permission denied.' });
+            } else if (result.state === 'granted') {
+                 setWeather({ status: 'idle' });
+            }
+        };
       });
     } else {
-        handleGetWeather();
+      // Fallback for browsers without navigator.permissions
+      setWeather({ status: 'idle' });
     }
   }, []);
 
@@ -60,7 +72,6 @@ export function WeatherCard() {
         sessionStorage.removeItem(CACHE_KEY);
     }
     setWeather({ status: 'loading' });
-    setPermissionDenied(false);
 
     if (!navigator.geolocation) {
       setWeather({ status: 'error', message: 'Geolocation is not supported.' });
@@ -87,7 +98,7 @@ export function WeatherCard() {
       },
       (error) => {
         if (error.code === error.PERMISSION_DENIED) {
-          setPermissionDenied(true);
+          setPermissionState('denied');
           setWeather({
             status: 'error',
             message: 'Location permission denied.',
@@ -106,9 +117,11 @@ export function WeatherCard() {
           <div className="flex flex-col items-center justify-center text-center h-full">
             <MapPin className="h-8 w-8 text-muted-foreground mb-2" />
             <p className="text-sm text-muted-foreground mb-4">
-              Get local weather updates.
+              {permissionState === 'granted' ? 'Get current weather for your location.' : 'Get local weather updates.'}
             </p>
-            <Button onClick={() => handleGetWeather()}>Enable Location</Button>
+            <Button onClick={() => handleGetWeather()}>
+              {permissionState === 'granted' ? 'Get Weather' : 'Enable Location'}
+            </Button>
           </div>
         );
       case 'loading':
@@ -126,12 +139,12 @@ export function WeatherCard() {
           <div className="flex flex-col items-center justify-center text-center h-full text-destructive">
             <AlertTriangle className="h-8 w-8 mb-2" />
             <p className="text-sm font-medium">{weather.message}</p>
-            {permissionDenied && (
+            {permissionState === 'denied' && (
               <p className="text-xs text-muted-foreground mt-1">
                 Please enable location access in your browser settings.
               </p>
             )}
-            {!permissionDenied && (
+            {permissionState !== 'denied' && (
               <Button variant="outline" size="sm" className="mt-4" onClick={() => handleGetWeather()}>
                 Try Again
               </Button>
@@ -155,6 +168,8 @@ export function WeatherCard() {
             </Button>
           </div>
         );
+      default:
+        return null;
     }
   };
 
