@@ -17,10 +17,21 @@ export default function Home() {
   const [userLocation, setUserLocation] = useState<{latitude: number, longitude: number} | null>(null);
 
   useEffect(() => {
+    const handleLocationUpdate = (event: Event) => {
+      const customEvent = event as CustomEvent;
+      setUserLocation(customEvent.detail);
+    };
+
     const locationStr = sessionStorage.getItem('userLocation');
     if (locationStr) {
       setUserLocation(JSON.parse(locationStr));
     }
+
+    window.addEventListener('locationUpdated', handleLocationUpdate);
+
+    return () => {
+      window.removeEventListener('locationUpdated', handleLocationUpdate);
+    };
   }, []);
 
   const alertsQuery = useMemoFirebase(() => {

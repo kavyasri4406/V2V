@@ -51,7 +51,10 @@ export function WeatherCard() {
       async (position) => {
         try {
           const { latitude, longitude } = position.coords;
-          sessionStorage.setItem('userLocation', JSON.stringify({ latitude, longitude }));
+          const locationData = { latitude, longitude };
+          sessionStorage.setItem('userLocation', JSON.stringify(locationData));
+          window.dispatchEvent(new CustomEvent('locationUpdated', { detail: locationData }));
+          
           const weatherData = await getWeather({ lat: latitude, lon: longitude });
           const now = Date.now();
           setWeather(weatherData);
