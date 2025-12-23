@@ -10,7 +10,7 @@ import { formatDistanceToNow } from 'date-fns';
 import { MapPin, Wind, Droplets, RefreshCw, AlertCircle, Loader2 } from 'lucide-react';
 
 type CachedWeather = {
-  data: GetWeatherOutput;
+  data: GetWeatherOutput & { lat: number; lon: number };
   timestamp: number;
 };
 
@@ -111,14 +111,14 @@ export function WeatherCard() {
         }
       },
       (error) => {
-        setError('Could not get location. Please enable it in your browser or browser settings.');
+        setError('Could not get location. Please enable it in your browser settings.');
         setIsLoading(false);
       }
     );
   };
   
   const renderContent = () => {
-    if (permissionStatus === 'loading' || isLoading && !weather) {
+    if (permissionStatus === 'loading' || (isLoading && !weather)) {
       return (
         <div className="space-y-4">
           <Skeleton className="h-8 w-3/4" />
