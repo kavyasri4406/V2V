@@ -79,30 +79,28 @@ export function WeatherCard() {
   };
 
   useEffect(() => {
-    // Check for cached data first
     const cached = sessionStorage.getItem('weatherCache');
     if (cached) {
       const { data, timestamp }: CachedWeather = JSON.parse(cached);
       if (Date.now() - timestamp < CACHE_DURATION_MS) {
         setWeather(data);
         setLastUpdated(timestamp);
+        setIsLoading(false);
+        navigator.permissions?.query({ name: 'geolocation' }).then((result) => {
+            setPermissionStatus(result.state);
+        });
+        return;
       }
     }
-
-    // Then check permissions
+    
     navigator.permissions?.query({ name: 'geolocation' }).then((result) => {
       setPermissionStatus(result.state);
       result.onchange = () => {
         setPermissionStatus(result.state);
       };
+      setIsLoading(false);
     });
-    
-    setIsLoading(false);
   }, []);
-
-  const requestPermission = () => {
-    handleGetWeather(true);
-  };
 
   const renderContent = () => {
     if (isLoading) {
@@ -124,7 +122,8 @@ export function WeatherCard() {
           <AlertCircle className="h-8 w-8" />
           <p>{error}</p>
           <Button onClick={() => handleGetWeather(true)} disabled={isRateLimited}>
-            {isRateLimited ? <Loader2 className="animate-spin" /> : 'Retry'}
+            {isRateLimited ? <Loader2 className="animate-spin mr-2" /> : null}
+            {isRateLimited ? 'Retrying...' : 'Retry'}
           </Button>
         </div>
       );
@@ -139,7 +138,7 @@ export function WeatherCard() {
               <CardDescription>{weather.condition}</CardDescription>
             </div>
             <Button variant="ghost" size="icon" onClick={() => handleGetWeather(true)} disabled={isRateLimited}>
-               <RefreshCw className="h-4 w-4" />
+               {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
               <span className="sr-only">Refresh Weather</span>
             </Button>
           </div>
@@ -171,7 +170,7 @@ export function WeatherCard() {
          <div className="text-center flex flex-col items-center gap-4">
             <MapPin className="h-8 w-8 text-muted-foreground" />
             <p className="text-muted-foreground">Enable location access to see local weather.</p>
-            <Button onClick={requestPermission}>Allow Location</Button>
+            <Button onClick={() => handleGetWeather(true)}>Allow Location</Button>
         </div>
       )
     }
@@ -185,16 +184,15 @@ export function WeatherCard() {
        )
     }
 
-
     return (
         <div className="text-center flex flex-col items-center gap-4">
             <p className="text-muted-foreground">Press the button to get the current weather for your location.</p>
             <Button onClick={() => handleGetWeather(true)} disabled={isRateLimited}>
+                {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
                 Get Weather
             </Button>
         </div>
     );
-
   };
 
   return (
