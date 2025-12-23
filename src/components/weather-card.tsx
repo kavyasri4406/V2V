@@ -83,7 +83,6 @@ export function WeatherCard() {
   }, []);
 
   useEffect(() => {
-    // On initial load, check for cached data but don't fetch.
     const cachedItem = sessionStorage.getItem(CACHE_KEY);
     if (cachedItem) {
       const { data, timestamp } = JSON.parse(cachedItem) as CachedWeatherData;
@@ -97,7 +96,7 @@ export function WeatherCard() {
 
 
   const renderContent = () => {
-    if (isLoading) {
+    if (isLoading && !weatherData) {
       return (
         <div className="space-y-4">
           <Skeleton className="h-8 w-3/4" />
@@ -130,7 +129,7 @@ export function WeatherCard() {
         <div className="space-y-4">
           <div className="flex justify-between items-start">
             <div>
-              <CardTitle className="text-xl">{weatherData.locationName}</CardTitle>
+              <p className="text-muted-foreground">{weatherData.locationName}</p>
               <CardDescription>{weatherData.condition}</CardDescription>
             </div>
             <Button
@@ -181,7 +180,10 @@ export function WeatherCard() {
 
   return (
     <Card className="animate-in fade-in-0 delay-300 duration-500">
-        <CardContent className="pt-6">
+        <CardHeader>
+            <CardTitle>Current Weather</CardTitle>
+        </CardHeader>
+        <CardContent>
             {renderContent()}
         </CardContent>
     </Card>

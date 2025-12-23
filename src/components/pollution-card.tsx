@@ -79,7 +79,7 @@ export function PollutionCard() {
   useEffect(() => {
     const cachedItem = sessionStorage.getItem(CACHE_KEY);
     if (cachedItem) {
-      const { data, timestamp } = JSON.parse(cachedItem) as Cached/Users/donoho/code/google/firebase-studio/studio/server/src/prompts/steps/change/testdata/change-1-golden.jsonPollutionData;
+      const { data, timestamp } = JSON.parse(cachedItem) as CachedPollutionData;
       if (Date.now() - timestamp < CACHE_DURATION_MS) {
         setPollutionData(data);
         setLastUpdated(new Date(timestamp));
@@ -89,7 +89,7 @@ export function PollutionCard() {
   }, []);
 
   const renderContent = () => {
-    if (isLoading) {
+    if (isLoading && !pollutionData) {
       return (
         <div className="space-y-4">
           <Skeleton className="h-8 w-3/4" />
@@ -118,9 +118,9 @@ export function PollutionCard() {
       return (
         <div className="space-y-4">
           <div className="flex justify-between items-start">
-            <div>
-              <CardTitle className="text-xl">{pollutionData.locationName}</CardTitle>
-              <CardDescription>Air Quality Index</CardDescription>
+             <div>
+                <p className="text-muted-foreground">{pollutionData.locationName}</p>
+                <CardDescription>Air Quality Index</CardDescription>
             </div>
              <Button
                 variant="ghost"
@@ -168,7 +168,10 @@ export function PollutionCard() {
 
   return (
     <Card className="animate-in fade-in-0 delay-500 duration-500">
-      <CardContent className="pt-6">
+      <CardHeader>
+            <CardTitle>Air Quality</CardTitle>
+      </CardHeader>
+      <CardContent>
         {renderContent()}
       </CardContent>
     </Card>
