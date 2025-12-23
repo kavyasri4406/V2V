@@ -4,11 +4,10 @@ import type { Alert } from "@/lib/types";
 import { formatDistanceToNow } from "date-fns";
 import { Card, CardContent } from "@/components/ui/card";
 import { AlertIcon } from "./alert-icon";
-import { getDistance } from "@/lib/utils";
 import { MapPin } from "lucide-react";
 
 type AlertCardProps = {
-  alert: Alert;
+  alert: Alert & { distance?: number };
 };
 
 export function AlertCard({ alert }: AlertCardProps) {
@@ -21,11 +20,19 @@ export function AlertCard({ alert }: AlertCardProps) {
         <div className="flex-1 space-y-1">
           <div className="flex justify-between items-center">
             <p className="font-semibold text-card-foreground">{alert.driver_name} <span className="font-normal text-muted-foreground">({alert.sender_vehicle})</span></p>
-            <p className="text-xs text-muted-foreground">
-              {formatDistanceToNow(new Date(alert.timestamp), {
-                  addSuffix: true,
-              })}
-            </p>
+            <div className="flex items-center gap-4">
+              {alert.distance !== undefined && (
+                <div className="flex items-center text-xs text-muted-foreground">
+                  <MapPin className="h-3 w-3 mr-1" />
+                  <span>{alert.distance.toFixed(1)} km away</span>
+                </div>
+              )}
+              <p className="text-xs text-muted-foreground">
+                {formatDistanceToNow(new Date(alert.timestamp), {
+                    addSuffix: true,
+                })}
+              </p>
+            </div>
           </div>
           <p className="text-sm text-muted-foreground">{alert.message}</p>
         </div>

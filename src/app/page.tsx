@@ -8,11 +8,20 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { AlertCard } from '@/components/alert-card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Users, AlertTriangle, Send, RadioTower } from 'lucide-react';
-import { useMemo } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { WeatherCard } from '@/components/weather-card';
+import { getDistance } from '@/lib/utils';
 
 export default function Home() {
   const firestore = useFirestore();
+  const [userLocation, setUserLocation] = useState<{latitude: number, longitude: number} | null>(null);
+
+  useEffect(() => {
+    const locationStr = sessionStorage.getItem('userLocation');
+    if (locationStr) {
+      setUserLocation(JSON.parse(locationStr));
+    }
+  }, []);
 
   const alertsQuery = useMemoFirebase(() => {
     if (!firestore) return null;
@@ -27,10 +36,14 @@ export default function Home() {
     return allAlerts.map(alert => {
       const timestamp = alert.timestamp;
       const timestampMs = timestamp instanceof Timestamp ? timestamp.toMillis() : (typeof timestamp === 'number' ? timestamp : 0);
-      return { ...alert, id: alert.id, timestamp: timestampMs, latitude: alert.latitude, longitude: alert.longitude };
+      let distance;
+      if (userLocation && alert.latitude && alert.longitude) {
+        distance = getDistance(userLocation.latitude, userLocation.longitude, alert.latitude, alert.longitude);
+      }
+      return { ...alert, id: alert.id, timestamp: timestampMs, latitude: alert.latitude, longitude: alert.longitude, distance };
     }).filter(alert => alert.timestamp > 0)
       .sort((a, b) => b.timestamp - a.timestamp);
-  }, [allAlerts]);
+  }, [allAlerts, userLocation]);
 
 
   const latestAlert = useMemo(() => {

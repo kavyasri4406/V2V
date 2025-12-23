@@ -51,6 +51,7 @@ export function WeatherCard() {
       async (position) => {
         try {
           const { latitude, longitude } = position.coords;
+          sessionStorage.setItem('userLocation', JSON.stringify({ latitude, longitude }));
           const weatherData = await getWeather({ lat: latitude, lon: longitude });
           const now = Date.now();
           setWeather(weatherData);
@@ -79,27 +80,25 @@ export function WeatherCard() {
   };
 
   useEffect(() => {
-    const cached = sessionStorage.getItem('weatherCache');
-    if (cached) {
-      const { data, timestamp }: CachedWeather = JSON.parse(cached);
-      if (Date.now() - timestamp < CACHE_DURATION_MS) {
-        setWeather(data);
-        setLastUpdated(timestamp);
-        setIsLoading(false);
-        navigator.permissions?.query({ name: 'geolocation' }).then((result) => {
-            setPermissionStatus(result.state);
-        });
-        return;
+    const checkCacheAndPermissions = () => {
+      const cached = sessionStorage.getItem('weatherCache');
+      if (cached) {
+        const { data, timestamp }: CachedWeather = JSON.parse(cached);
+        if (Date.now() - timestamp < CACHE_DURATION_MS) {
+          setWeather(data);
+          setLastUpdated(timestamp);
+        }
       }
-    }
-    
-    navigator.permissions?.query({ name: 'geolocation' }).then((result) => {
-      setPermissionStatus(result.state);
-      result.onchange = () => {
+  
+      navigator.permissions?.query({ name: 'geolocation' }).then((result) => {
         setPermissionStatus(result.state);
-      };
+        result.onchange = () => {
+          setPermissionStatus(result.state);
+        };
+      });
       setIsLoading(false);
-    });
+    };
+    checkCacheAndPermissions();
   }, []);
 
   const renderContent = () => {
@@ -138,7 +137,7 @@ export function WeatherCard() {
               <CardDescription>{weather.condition}</CardDescription>
             </div>
             <Button variant="ghost" size="icon" onClick={() => handleGetWeather(true)} disabled={isRateLimited}>
-               {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+               {isRateLimited ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
               <span className="sr-only">Refresh Weather</span>
             </Button>
           </div>
@@ -187,7 +186,7 @@ export function WeatherCard() {
     return (
         <div className="text-center flex flex-col items-center gap-4">
             <p className="text-muted-foreground">Press the button to get the current weather for your location.</p>
-            <Button onClick={() => handleGetWeather(true)} disabled={isRateLimited}>
+            <Button onClick={() => handleGetWeather(true)} disabled={isLoading || isRateLimited}>
                 {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
                 Get Weather
             </Button>
