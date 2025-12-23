@@ -9,6 +9,7 @@ import { AlertCard } from '@/components/alert-card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Users, AlertTriangle, Send, RadioTower } from 'lucide-react';
 import { useMemo, useState, useEffect } from 'react';
+import { WeatherCard } from '@/components/weather-card';
 import { PollutionCard } from '@/components/pollution-card';
 import { getDistance } from '@/lib/utils';
 
@@ -130,6 +131,7 @@ export default function Home() {
             </div>
             
             <div className="space-y-8">
+                <WeatherCard />
                 <PollutionCard />
                 <Card className="animate-in fade-in-0 delay-300 duration-500">
                     <CardHeader>
