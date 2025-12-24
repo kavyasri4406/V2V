@@ -22,6 +22,7 @@ const placeCategories: { name: PlaceCategory; icon: React.ElementType, query: st
 
 export default function NearbyPage() {
   const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
+  const [mapCenter, setMapCenter] = useState<{ lat: number, lng: number}>({ lat: 40.7128, lng: -74.0060 });
   const [places, setPlaces] = useState<Place[]>([]);
   const [selectedPlace, setSelectedPlace] = useState<Place | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -37,10 +38,6 @@ export default function NearbyPage() {
     setSelectedPlace(null);
 
     const getLocation = new Promise<{ lat: number; lng: number }>((resolve, reject) => {
-      if (userLocation) {
-        resolve(userLocation);
-        return;
-      }
       if (!navigator.geolocation) {
         reject(new Error('Geolocation is not supported by your browser.'));
         return;
@@ -52,6 +49,7 @@ export default function NearbyPage() {
             lng: position.coords.longitude,
           };
           setUserLocation(newUserLocation);
+          setMapCenter(newUserLocation);
           resolve(newUserLocation);
         },
         () => {
@@ -85,12 +83,11 @@ export default function NearbyPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [userLocation, toast]);
+  }, [toast]);
   
   useEffect(() => {
-    // Center map on selected place
     if (selectedPlace) {
-        setUserLocation({ lat: selectedPlace.latitude, lng: selectedPlace.longitude });
+        setMapCenter({ lat: selectedPlace.latitude, lng: selectedPlace.longitude });
     }
   }, [selectedPlace]);
 
@@ -183,14 +180,15 @@ export default function NearbyPage() {
             </CardContent>
           </Card>
         </div>
-        <div className="lg:col-span-2 rounded-lg overflow-hidden border">
+        <div className="lg:col-span-2 rounded-lg overflow-hidden border h-full">
            <Map
                 mapId="v2v-nearby-map"
                 defaultZoom={12}
                 defaultCenter={{ lat: 40.7128, lng: -74.0060 }}
-                center={userLocation}
+                center={mapCenter}
                 gestureHandling={'greedy'}
                 disableDefaultUI={true}
+                style={{ height: '100%' }}
             >
                 {userLocation && (
                     <AdvancedMarker position={userLocation} title="Your Location">
@@ -199,7 +197,7 @@ export default function NearbyPage() {
                 )}
                 {places.map((place) => (
                     <AdvancedMarker
-                        key={place.name}
+                        key={place.name + place.address}
                         position={{ lat: place.latitude, lng: place.longitude }}
                         onClick={() => setSelectedPlace(place)}
                         title={place.name}
