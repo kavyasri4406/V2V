@@ -2,7 +2,8 @@
 
 import { useState, useCallback, useEffect } from 'react';
 import { APIProvider, Map, AdvancedMarker, Pin } from '@vis.gl/react-google-maps';
-import { getNearbyPlaces, type GetNearbyPlacesOutput, type GetNearbyPlacesInput } from '@/ai/flows/get-nearby-places-flow';
+import { getNearbyPlaces } from '@/ai/flows/get-nearby-places-flow';
+import type { GetNearbyPlacesOutput, GetNearbyPlacesInput } from '@/ai/flows/nearby-places-types';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
