@@ -111,7 +111,7 @@ export default function NearbyPage() {
 
   return (
     <APIProvider apiKey={apiKey}>
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-[calc(100vh-10rem)]">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-full">
         <div className="lg:col-span-1 flex flex-col gap-6">
           <Card>
             <CardHeader>
@@ -180,7 +180,7 @@ export default function NearbyPage() {
             </CardContent>
           </Card>
         </div>
-        <div className="lg:col-span-2 rounded-lg overflow-hidden border h-full">
+        <div className="lg:col-span-2 rounded-lg overflow-hidden border min-h-[500px] h-full">
            <Map
                 mapId="v2v-nearby-map"
                 defaultZoom={12}
@@ -188,7 +188,7 @@ export default function NearbyPage() {
                 center={mapCenter}
                 gestureHandling={'greedy'}
                 disableDefaultUI={true}
-                style={{ height: '100%' }}
+                style={{ height: '100%', width: '100%' }}
             >
                 {userLocation && (
                     <AdvancedMarker position={userLocation} title="Your Location">
