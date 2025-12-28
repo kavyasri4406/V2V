@@ -23,10 +23,7 @@ import {
   XCircle,
   Siren,
   Flame,
-  TriangleAlert,
-  Fuel,
-  Hospital,
-  Wrench
+  TriangleAlert
 } from 'lucide-react';
 
 
@@ -47,9 +44,6 @@ const quickActions = [
   { name: 'Police Activity', icon: Siren },
   { name: 'Fire', icon: Flame },
   { name: 'General Hazard', icon: TriangleAlert },
-  { name: 'Petrol Station', icon: Fuel },
-  { name: 'Hospital', icon: Hospital },
-  { name: 'Repair Shop', icon: Wrench },
 ];
 
 export default function DetailedAlertPage() {
