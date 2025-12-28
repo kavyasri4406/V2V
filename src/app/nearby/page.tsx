@@ -92,25 +92,8 @@ export default function NearbyPage() {
   }, [selectedPlace]);
 
 
-  const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || '';
-
-  if (!apiKey) {
-    return (
-      <div className="flex items-center justify-center h-full">
-        <Card className="max-w-lg text-center">
-            <CardHeader>
-                <CardTitle>Configuration Error</CardTitle>
-            </CardHeader>
-            <CardContent>
-                <p className="text-destructive">The Google Maps API key is missing. Please ask the developer to configure it.</p>
-            </CardContent>
-        </Card>
-      </div>
-    );
-  }
-
   return (
-    <APIProvider apiKey={apiKey}>
+    <APIProvider>
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-full">
         <div className="lg:col-span-1 flex flex-col gap-6">
           <Card>
