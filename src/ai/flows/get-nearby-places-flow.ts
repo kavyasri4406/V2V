@@ -19,7 +19,7 @@ const PlaceSchema = z.object({
 const GetNearbyPlacesInputSchema = z.object({
   latitude: z.number().describe('The latitude of the user\'s location.'),
   longitude: z.number().describe('The longitude of the user\'s location.'),
-  placeType: z.enum(['petrol station', 'hospital', 'repair shop']).describe('The type of place to search for.'),
+  placeType: z.enum(['petrol station', 'hospital', 'car repair', 'bike repair']).describe('The type of place to search for.'),
 });
 export type GetNearbyPlacesInput = z.infer<typeof GetNearbyPlacesInputSchema>;
 

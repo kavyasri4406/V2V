@@ -4,15 +4,16 @@ import { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { AlertCircle, Loader2, Fuel, Hospital, Wrench, Navigation, MapPin } from 'lucide-react';
+import { AlertCircle, Loader2, Fuel, Hospital, Car, Bike, Navigation, MapPin } from 'lucide-react';
 import { getNearbyPlaces, type GetNearbyPlacesOutput, type GetNearbyPlacesInput } from '@/ai/flows/get-nearby-places-flow';
 
-type PlaceType = 'petrol station' | 'hospital' | 'repair shop';
+type PlaceType = 'petrol station' | 'hospital' | 'car repair' | 'bike repair';
 
-const placeTypes: { name: PlaceType; icon: React.ElementType }[] = [
-  { name: 'petrol station', icon: Fuel },
-  { name: 'hospital', icon: Hospital },
-  { name: 'repair shop', icon: Wrench },
+const placeTypes: { name: PlaceType; icon: React.ElementType, title: string }[] = [
+  { name: 'petrol station', icon: Fuel, title: 'Petrol Stations' },
+  { name: 'hospital', icon: Hospital, title: 'Hospitals' },
+  { name: 'car repair', icon: Car, title: 'Car Repair' },
+  { name: 'bike repair', icon: Bike, title: 'Bike Repair' },
 ];
 
 type PlacesState = {
@@ -44,7 +45,7 @@ export default function NearbyPage() {
     } catch (e: any) {
       const errorMessage = e.message.includes('429') 
         ? 'Rate limit reached. Please wait a moment.'
-        : `Could not fetch ${placeType}s. The AI service may be unavailable.`;
+        : `Could not fetch ${placeType}. The AI service may be unavailable.`;
       setPlacesState(prev => ({
         ...prev,
         [placeType]: { data: null, isLoading: false, error: errorMessage },
@@ -126,7 +127,7 @@ export default function NearbyPage() {
     }
     
     if (state?.data && state.data.length === 0) {
-        return <p className="text-muted-foreground text-sm text-center">No nearby {placeType}s found.</p>;
+        return <p className="text-muted-foreground text-sm text-center">No nearby {placeType} found.</p>;
     }
 
     return null;
@@ -168,17 +169,17 @@ export default function NearbyPage() {
   }
 
   return (
-    <div className="w-full max-w-4xl mx-auto space-y-8">
+    <div className="w-full max-w-5xl mx-auto space-y-8">
       <div className="text-center">
         <h1 className="text-3xl font-bold">Nearby Places</h1>
         <p className="text-muted-foreground">Find essential services near your current location.</p>
       </div>
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {placeTypes.map(({ name, icon: Icon }) => (
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        {placeTypes.map(({ name, icon: Icon, title }) => (
           <Card key={name}>
             <CardHeader className="flex flex-row items-center gap-3">
               <Icon className="h-6 w-6 text-accent" />
-              <CardTitle className="capitalize">{name}s</CardTitle>
+              <CardTitle className="capitalize">{title}</CardTitle>
             </CardHeader>
             <CardContent>
               {renderPlaceCardContent(name)}
