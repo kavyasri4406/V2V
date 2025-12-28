@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { AlertCircle, Loader2, Fuel, Hospital, Car, Bike, Navigation, MapPin } from 'lucide-react';
+import { AlertCircle, Loader2, Fuel, Hospital, Car, Bike, Navigation, MapPin, Search } from 'lucide-react';
 import { getNearbyPlaces, type GetNearbyPlacesOutput, type GetNearbyPlacesInput } from '@/ai/flows/get-nearby-places-flow';
 
 type PlaceType = 'petrol station' | 'hospital' | 'car repair' | 'bike repair';
@@ -30,13 +30,19 @@ export default function NearbyPage() {
   const [isLocationLoading, setIsLocationLoading] = useState(true);
   const [placesState, setPlacesState] = useState<PlacesState>({});
 
-  const fetchPlaces = useCallback(async (placeType: PlaceType, latitude: number, longitude: number) => {
+  const fetchPlaces = useCallback(async (placeType: PlaceType) => {
+    if (!userLocation) {
+        setLocationError('Could not get location. Please enable location services.');
+        return;
+    }
+
     setPlacesState(prev => ({
       ...prev,
       [placeType]: { data: null, isLoading: true, error: null },
     }));
 
     try {
+      const { latitude, longitude } = userLocation;
       const result = await getNearbyPlaces({ latitude, longitude, placeType });
       setPlacesState(prev => ({
         ...prev,
@@ -51,7 +57,7 @@ export default function NearbyPage() {
         [placeType]: { data: null, isLoading: false, error: errorMessage },
       }));
     }
-  }, []);
+  }, [userLocation]);
 
   const handleGetLocation = useCallback(() => {
     setIsLocationLoading(true);
@@ -67,15 +73,13 @@ export default function NearbyPage() {
         const { latitude, longitude } = position.coords;
         setUserLocation({ latitude, longitude });
         setIsLocationLoading(false);
-        // Fetch all place types once location is available
-        placeTypes.forEach(pt => fetchPlaces(pt.name, latitude, longitude));
       },
       () => {
         setLocationError('Could not get location. Please enable location services.');
         setIsLocationLoading(false);
       }
     );
-  }, [fetchPlaces]);
+  }, []);
 
   useEffect(() => {
     handleGetLocation();
@@ -130,7 +134,15 @@ export default function NearbyPage() {
         return <p className="text-muted-foreground text-sm text-center">No nearby {placeType} found.</p>;
     }
 
-    return null;
+    // Initial state before fetching
+    return (
+        <div className="text-center flex flex-col items-center gap-4 py-4">
+            <p className="text-muted-foreground text-sm">Find nearby {placeType}s.</p>
+            <Button onClick={() => fetchPlaces(placeType)} disabled={!userLocation}>
+                <Search className="mr-2 h-4 w-4" /> Find
+            </Button>
+        </div>
+    );
   };
 
   const renderInitialState = () => {
@@ -160,7 +172,7 @@ export default function NearbyPage() {
     return null;
   }
 
-  if (!userLocation) {
+  if (isLocationLoading || locationError) {
     return (
         <div className="w-full max-w-4xl mx-auto">
             {renderInitialState()}
