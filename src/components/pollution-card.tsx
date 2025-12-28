@@ -77,16 +77,22 @@ export function PollutionCard() {
   }, []);
   
   useEffect(() => {
-    const cachedItem = sessionStorage.getItem(CACHE_KEY);
+    // Automatically fetch on load if no valid cache
+     const cachedItem = sessionStorage.getItem(CACHE_KEY);
+    let shouldFetch = true;
     if (cachedItem) {
       const { data, timestamp } = JSON.parse(cachedItem) as CachedPollutionData;
       if (Date.now() - timestamp < CACHE_DURATION_MS) {
         setPollutionData(data);
         setLastUpdated(new Date(timestamp));
+        shouldFetch = false;
       }
     }
+    if (shouldFetch) {
+      handleGetPollution(false);
+    }
     setIsLoading(false);
-  }, []);
+  }, [handleGetPollution]);
 
   const renderContent = () => {
     if (isLoading && !pollutionData) {

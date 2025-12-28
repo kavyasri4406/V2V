@@ -83,16 +83,24 @@ export function WeatherCard() {
   }, []);
 
   useEffect(() => {
+    // Automatically fetch weather on initial load if no recent cached data exists
     const cachedItem = sessionStorage.getItem(CACHE_KEY);
+    let shouldFetch = true;
     if (cachedItem) {
-      const { data, timestamp } = JSON.parse(cachedItem) as CachedWeatherData;
+      const { timestamp } = JSON.parse(cachedItem) as CachedWeatherData;
       if (Date.now() - timestamp < CACHE_DURATION_MS) {
-        setWeatherData(data);
-        setLastUpdated(new Date(timestamp));
+        shouldFetch = false;
       }
     }
-    setIsLoading(false);
-  }, []);
+    if (shouldFetch) {
+      handleGetWeather(false);
+    } else {
+       const { data, timestamp } = JSON.parse(cachedItem!) as CachedWeatherData;
+       setWeatherData(data);
+       setLastUpdated(new Date(timestamp));
+       setIsLoading(false);
+    }
+  }, [handleGetWeather]);
 
 
   const renderContent = () => {

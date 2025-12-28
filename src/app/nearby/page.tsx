@@ -21,8 +21,11 @@ type PlacesState = {
     data: GetNearbyPlacesOutput['places'] | null;
     isLoading: boolean;
     error: string | null;
+    isRateLimited: boolean;
   };
 };
+
+const RATE_LIMIT_COOLDOWN_MS = 60 * 1000; // 1 minute
 
 export default function NearbyPage() {
   const [userLocation, setUserLocation] = useState<{ latitude: number; longitude: number } | null>(null);
@@ -38,7 +41,7 @@ export default function NearbyPage() {
 
     setPlacesState(prev => ({
       ...prev,
-      [placeType]: { data: null, isLoading: true, error: null },
+      [placeType]: { data: null, isLoading: true, error: null, isRateLimited: false },
     }));
 
     try {
@@ -46,16 +49,31 @@ export default function NearbyPage() {
       const result = await getNearbyPlaces({ latitude, longitude, placeType });
       setPlacesState(prev => ({
         ...prev,
-        [placeType]: { data: result.places, isLoading: false, error: null },
+        [placeType]: { data: result.places, isLoading: false, error: null, isRateLimited: false },
       }));
     } catch (e: any) {
-      const errorMessage = e.message.includes('429') 
-        ? 'Rate limit reached. Please wait a moment.'
-        : `Could not fetch ${placeType}. The AI service may be unavailable.`;
-      setPlacesState(prev => ({
-        ...prev,
-        [placeType]: { data: null, isLoading: false, error: errorMessage },
-      }));
+      let errorMessage = `Could not fetch ${placeType}. The AI service may be unavailable.`;
+      let rateLimited = false;
+      if (typeof e.message === 'string' && (e.message.includes('429') || e.message.includes('Too Many Requests'))) {
+        errorMessage = 'Rate limit reached. Please wait a moment before trying again.';
+        rateLimited = true;
+      }
+      
+      setPlacesState(prev => {
+        const newState = {
+            ...prev,
+            [placeType]: { data: null, isLoading: false, error: errorMessage, isRateLimited: rateLimited },
+        };
+        if (rateLimited) {
+            setTimeout(() => {
+                setPlacesState(curr => ({
+                    ...curr,
+                    [placeType]: { ...curr[placeType]!, isRateLimited: false }
+                }));
+            }, RATE_LIMIT_COOLDOWN_MS);
+        }
+        return newState;
+      });
     }
   }, [userLocation]);
 
@@ -109,6 +127,9 @@ export default function NearbyPage() {
         <div className="text-center text-destructive flex flex-col items-center gap-2">
           <AlertCircle className="h-6 w-6" />
           <p className="text-sm">{state.error}</p>
+           {!state.isRateLimited && (
+                <Button variant="outline" size="sm" onClick={() => fetchPlaces(placeType)} className="mt-2">Try Again</Button>
+            )}
         </div>
       );
     }
@@ -138,8 +159,8 @@ export default function NearbyPage() {
     return (
         <div className="text-center flex flex-col items-center gap-4 py-4">
             <p className="text-muted-foreground text-sm">Find nearby {placeType}s.</p>
-            <Button onClick={() => fetchPlaces(placeType)} disabled={!userLocation}>
-                <Search className="mr-2 h-4 w-4" /> Find
+            <Button onClick={() => fetchPlaces(placeType)} disabled={!userLocation || state?.isRateLimited}>
+                {state?.isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <Search className="mr-2 h-4 w-4" />} Find
             </Button>
         </div>
     );
