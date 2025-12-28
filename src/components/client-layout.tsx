@@ -40,7 +40,6 @@ const navigationItems = [
     { name: 'Send Alert', href: '/send-alert', icon: Send, auth: true },
     { name: 'Quick Alert', href: '/detailed-alert', icon: MessageSquareWarning, auth: true },
     { name: 'Live Feed', href: '/live-feed', icon: RadioTower, auth: true },
-    { name: 'Nearby', href: '/nearby', icon: Map, auth: true },
     { name: 'Notes', href: '/notes', icon: NotebookPen, auth: true },
     { name: 'Settings', href: '/settings', icon: Settings, auth: true },
 ];
