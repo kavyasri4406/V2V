@@ -1,14 +1,5 @@
-'use client';
-
 import './globals.css';
-import { Toaster } from '@/components/ui/toaster';
-import { FirebaseClientProvider } from '@/firebase';
-import MainLayout from '@/components/main-layout';
-import { ClientOnly } from '@/components/client-only';
-import { usePathname } from 'next/navigation';
-import { AuthLayout } from '@/components/auth-layout';
-import { useState, useEffect } from 'react';
-import { SplashScreen } from '@/components/splash-screen';
+import { AppProviders } from './providers';
 
 export const metadata = {
   title: 'V2V AlertCast',
@@ -21,20 +12,6 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const pathname = usePathname();
-  const isAuthPage = pathname === '/login';
-  const [isLoading, setIsLoading] = useState(true);
-
-  useEffect(() => {
-    // This effect runs only once on the client
-    const timer = setTimeout(() => {
-      setIsLoading(false);
-    }, 3000); // Show splash for 3 seconds
-
-    return () => clearTimeout(timer);
-  }, []);
-
-
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
@@ -43,21 +20,9 @@ export default function RootLayout({
         <link href="https://fonts.googleapis.com/css2?family=PT+Sans:ital,wght@0,400;0,700;1,400;1,700&display=swap" rel="stylesheet" />
       </head>
       <body className="font-body antialiased">
-          {isLoading && <SplashScreen />}
-          <div className={isLoading ? 'hidden' : ''}>
-            <FirebaseClientProvider>
-              {isAuthPage ? (
-                <AuthLayout>{children}</AuthLayout>
-              ) : (
-                <MainLayout>
-                  {children}
-                </MainLayout>
-              )}
-            </FirebaseClientProvider>
-            <ClientOnly>
-              <Toaster />
-            </ClientOnly>
-          </div>
+        <AppProviders>
+          {children}
+        </AppProviders>
       </body>
     </html>
   );
