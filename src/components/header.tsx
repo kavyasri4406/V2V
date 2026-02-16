@@ -1,6 +1,6 @@
 'use client';
 
-import { Car } from "lucide-react";
+import { CarFront } from "lucide-react";
 import { SidebarTrigger } from "./ui/sidebar";
 
 export default function Header() {
@@ -8,9 +8,9 @@ export default function Header() {
     <header className="sticky top-0 z-20 w-full border-b border-border/40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="container mx-auto flex h-16 items-center px-4">
         <div className="mr-4 hidden md:flex">
-          <Car className="mr-2 h-6 w-6" />
+          <CarFront className="mr-2 h-6 w-6 text-accent" />
           <h1 className="text-lg font-bold tracking-tight text-foreground font-headline">
-            Vehicle to Vehicle Communication
+            V2V AlertCast
           </h1>
         </div>
         <div className="flex items-center md:hidden">

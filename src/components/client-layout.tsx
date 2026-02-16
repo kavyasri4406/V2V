@@ -26,15 +26,14 @@ import {
     RadioTower,
     Settings,
     MessageSquareWarning,
-    Car,
     LogOut,
     LogIn,
     NotebookPen,
-    Map,
     Navigation,
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { signOut } from 'firebase/auth';
+import { AppLogo } from './app-logo';
 
 const navigationItems = [
     { name: 'Home', href: '/', icon: Home, auth: false },
@@ -130,11 +129,8 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
             <div className="flex min-h-screen">
                 <Sidebar collapsible="icon" className="p-2">
                     <SidebarHeader>
-                        <div className="flex items-center gap-2 p-2">
-                            <Car className="w-6 h-6 text-primary" />
-                            <span className="text-lg font-semibold group-data-[collapsible=icon]:hidden">
-                                V2V
-                            </span>
+                        <div className="flex items-center justify-center p-2 group-data-[collapsible=icon]:p-0">
+                           <AppLogo isCompact={true} />
                         </div>
                     </SidebarHeader>
                     <SidebarContent>

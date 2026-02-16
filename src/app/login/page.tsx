@@ -31,8 +31,9 @@ import {
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
-import { Car, Loader2 } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
 import { FirebaseError } from 'firebase/app';
+import { AppLogo } from '@/components/app-logo';
 
 const formSchema = z.object({
   email: z.string().email({
@@ -132,9 +133,8 @@ export default function LoginPage() {
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
         <Card>
           <CardHeader className="text-center">
-            <div className="flex justify-center items-center gap-2 mb-4">
-               <Car className="h-8 w-8 text-primary" />
-               <h1 className="text-2xl font-bold">V2V AlertCast</h1>
+            <div className="flex justify-center items-center mb-4">
+               <AppLogo />
             </div>
             <TabsList className="grid w-full grid-cols-2">
               <TabsTrigger value="signin">Sign In</TabsTrigger>
