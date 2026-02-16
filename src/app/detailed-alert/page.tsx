@@ -8,6 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { useToast } from '@/hooks/use-toast';
 import { Loader2 } from 'lucide-react';
 import type { UserProfile } from '@/lib/types';
+import { defaultLocation } from '@/lib/location';
 import { 
   ShieldAlert, 
   TrafficCone, 
@@ -23,7 +24,10 @@ import {
   XCircle,
   Siren,
   Flame,
-  TriangleAlert
+  TriangleAlert,
+  Fuel,
+  Hospital,
+  Bike
 } from 'lucide-react';
 
 
@@ -44,6 +48,10 @@ const quickActions = [
   { name: 'Police Activity', icon: Siren },
   { name: 'Fire', icon: Flame },
   { name: 'General Hazard', icon: TriangleAlert },
+  { name: 'Petrol Station', icon: Fuel },
+  { name: 'Hospital', icon: Hospital },
+  { name: 'Car Repair', icon: Car },
+  { name: 'Bike Repair', icon: Bike },
 ];
 
 export default function DetailedAlertPage() {
@@ -127,7 +135,7 @@ export default function DetailedAlertPage() {
       return;
     }
 
-    const baseAlert = {
+    let alertData: any = {
       driver_name: userProfile?.driverName || 'Anonymous',
       sender_vehicle: userProfile?.vehicleNumber || 'N/A',
       message: message,
@@ -135,24 +143,12 @@ export default function DetailedAlertPage() {
       userId: user.uid,
     };
 
-    if (locationEnabled && navigator.geolocation) {
-        navigator.geolocation.getCurrentPosition(
-            (position) => {
-                const { latitude, longitude } = position.coords;
-                sendAlert({ ...baseAlert, latitude, longitude });
-            },
-            () => {
-                toast({
-                    variant: 'destructive',
-                    title: 'Location Error',
-                    description: 'Could not get location. Alert sent without it.',
-                });
-                sendAlert(baseAlert);
-            }
-        );
-    } else {
-        sendAlert(baseAlert);
+    if (locationEnabled) {
+        const { latitude, longitude } = defaultLocation;
+        alertData = { ...alertData, latitude, longitude };
     }
+
+    sendAlert(alertData);
   };
 
   return (

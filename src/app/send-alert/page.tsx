@@ -20,6 +20,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { useToast } from '@/hooks/use-toast';
 import { Send, Loader2 } from 'lucide-react';
 import type { UserProfile } from '@/lib/types';
+import { defaultLocation } from '@/lib/location';
 
 const formSchema = z.object({
   message: z.string().min(5, {
@@ -116,7 +117,7 @@ export default function SendAlertPage() {
       return;
     }
 
-    const baseAlert = {
+    let alertData: any = {
       driver_name: userProfile?.driverName || 'Anonymous',
       sender_vehicle: userProfile?.vehicleNumber || 'N/A',
       message: values.message,
@@ -124,24 +125,12 @@ export default function SendAlertPage() {
       userId: user.uid,
     };
 
-    if (locationEnabled && navigator.geolocation) {
-        navigator.geolocation.getCurrentPosition(
-            (position) => {
-                const { latitude, longitude } = position.coords;
-                sendAlert({ ...baseAlert, latitude, longitude });
-            },
-            () => {
-                toast({
-                    variant: 'destructive',
-                    title: 'Location Error',
-                    description: 'Could not get your location. Alert sent without location data.',
-                });
-                sendAlert(baseAlert);
-            }
-        );
-    } else {
-        sendAlert(baseAlert);
+    if (locationEnabled) {
+      const { latitude, longitude } = defaultLocation;
+      alertData = { ...alertData, latitude, longitude };
     }
+    
+    sendAlert(alertData);
   }
 
   return (

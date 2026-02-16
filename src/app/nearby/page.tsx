@@ -4,8 +4,9 @@ import { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { AlertCircle, Loader2, Fuel, Hospital, Car, Bike, Navigation, MapPin, Search } from 'lucide-react';
-import { getNearbyPlaces, type GetNearbyPlacesOutput, type GetNearbyPlacesInput } from '@/ai/flows/get-nearby-places-flow';
+import { AlertCircle, Loader2, Fuel, Hospital, Car, Bike, MapPin, Search } from 'lucide-react';
+import { getNearbyPlaces, type GetNearbyPlacesOutput } from '@/ai/flows/get-nearby-places-flow';
+import { defaultLocation } from '@/lib/location';
 
 type PlaceType = 'petrol station' | 'hospital' | 'car repair' | 'bike repair';
 
@@ -28,17 +29,10 @@ type PlacesState = {
 const RATE_LIMIT_COOLDOWN_MS = 60 * 1000; // 1 minute
 
 export default function NearbyPage() {
-  const [userLocation, setUserLocation] = useState<{ latitude: number; longitude: number } | null>(null);
-  const [locationError, setLocationError] = useState<string | null>(null);
-  const [isLocationLoading, setIsLocationLoading] = useState(true);
   const [placesState, setPlacesState] = useState<PlacesState>({});
+  const userLocation = defaultLocation;
 
   const fetchPlaces = useCallback(async (placeType: PlaceType) => {
-    if (!userLocation) {
-        setLocationError('Could not get location. Please enable location services.');
-        return;
-    }
-
     setPlacesState(prev => ({
       ...prev,
       [placeType]: { data: null, isLoading: true, error: null, isRateLimited: false },
@@ -76,32 +70,6 @@ export default function NearbyPage() {
       });
     }
   }, [userLocation]);
-
-  const handleGetLocation = useCallback(() => {
-    setIsLocationLoading(true);
-    setLocationError(null);
-    if (!navigator.geolocation) {
-      setLocationError('Geolocation is not supported by your browser.');
-      setIsLocationLoading(false);
-      return;
-    }
-
-    navigator.geolocation.getCurrentPosition(
-      (position) => {
-        const { latitude, longitude } = position.coords;
-        setUserLocation({ latitude, longitude });
-        setIsLocationLoading(false);
-      },
-      () => {
-        setLocationError('Could not get location. Please enable location services.');
-        setIsLocationLoading(false);
-      }
-    );
-  }, []);
-
-  useEffect(() => {
-    handleGetLocation();
-  }, [handleGetLocation]);
 
   const renderPlaceCardContent = (placeType: PlaceType) => {
     const state = placesState[placeType];
@@ -159,53 +127,18 @@ export default function NearbyPage() {
     return (
         <div className="text-center flex flex-col items-center gap-4 py-4">
             <p className="text-muted-foreground text-sm">Find nearby {placeType}s.</p>
-            <Button onClick={() => fetchPlaces(placeType)} disabled={!userLocation || state?.isRateLimited}>
+            <Button onClick={() => fetchPlaces(placeType)} disabled={state?.isRateLimited}>
                 {state?.isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <Search className="mr-2 h-4 w-4" />} Find
             </Button>
         </div>
     );
   };
 
-  const renderInitialState = () => {
-    if (isLocationLoading) {
-        return (
-            <Card className="flex flex-col items-center justify-center p-8 gap-4 text-center">
-                <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                <CardTitle>Finding Your Location</CardTitle>
-                <CardDescription>Please wait while we determine your current position.</CardDescription>
-            </Card>
-        );
-    }
-
-    if (locationError) {
-        return (
-             <Card className="flex flex-col items-center justify-center p-8 gap-4 text-center">
-                <AlertCircle className="h-8 w-8 text-destructive" />
-                <CardTitle>Location Error</CardTitle>
-                <CardDescription>{locationError}</CardDescription>
-                <Button onClick={handleGetLocation}>
-                    <Navigation className="mr-2 h-4 w-4" /> Try Again
-                </Button>
-            </Card>
-        )
-    }
-
-    return null;
-  }
-
-  if (isLocationLoading || locationError) {
-    return (
-        <div className="w-full max-w-4xl mx-auto">
-            {renderInitialState()}
-        </div>
-    )
-  }
-
   return (
     <div className="w-full max-w-5xl mx-auto space-y-8">
       <div className="text-center">
         <h1 className="text-3xl font-bold">Nearby Places</h1>
-        <p className="text-muted-foreground">Find essential services near your current location.</p>
+        <p className="text-muted-foreground">Find essential services near your location.</p>
       </div>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {placeTypes.map(({ name, icon: Icon, title }) => (

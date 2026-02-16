@@ -4,10 +4,11 @@ import { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Thermometer, Droplet, Wind, RefreshCw, AlertCircle, MapPin, Loader2 } from 'lucide-react';
+import { Droplet, Wind, RefreshCw, AlertCircle, MapPin, Loader2 } from 'lucide-react';
 import { getWeather, type GetWeatherOutput } from '@/ai/flows/get-weather-flow';
 import { WeatherIcon } from './weather-icon';
 import { formatDistanceToNow } from 'date-fns';
+import { defaultLocation } from '@/lib/location';
 
 const CACHE_KEY = 'weatherData';
 const CACHE_DURATION_MS = 5 * 60 * 1000; // 5 minutes
@@ -20,7 +21,7 @@ type CachedWeatherData = {
 
 export function WeatherCard() {
   const [weatherData, setWeatherData] = useState<GetWeatherOutput | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const [isRateLimited, setIsRateLimited] = useState(false);
@@ -29,7 +30,6 @@ export function WeatherCard() {
     setIsLoading(true);
     setError(null);
     
-    // Check for cached data first
     const cachedItem = sessionStorage.getItem(CACHE_KEY);
     if (cachedItem && !forceRefresh) {
         const { data, timestamp } = JSON.parse(cachedItem) as CachedWeatherData;
@@ -41,65 +41,36 @@ export function WeatherCard() {
         }
     }
 
-    if (!navigator.geolocation) {
-      setError('Geolocation is not supported by your browser.');
-      setIsLoading(false);
-      return;
-    }
+    const { latitude, longitude, name } = defaultLocation;
 
-    navigator.geolocation.getCurrentPosition(
-      async (position) => {
-        const { latitude, longitude } = position.coords;
-        
-        // Share location globally
-        const locationEvent = new CustomEvent('locationUpdated', { detail: { latitude, longitude } });
-        window.dispatchEvent(locationEvent);
-        sessionStorage.setItem('userLocation', JSON.stringify({ latitude, longitude }));
+    // Share location globally
+    const locationEvent = new CustomEvent('locationUpdated', { detail: { latitude, longitude } });
+    window.dispatchEvent(locationEvent);
+    sessionStorage.setItem('userLocation', JSON.stringify({ latitude, longitude }));
 
-        try {
-          const result = await getWeather({ latitude, longitude });
-          const now = Date.now();
-          setWeatherData(result);
-          setLastUpdated(new Date(now));
-          sessionStorage.setItem(CACHE_KEY, JSON.stringify({ data: result, timestamp: now }));
-          setError(null);
-        } catch (e: any) {
-           if (typeof e.message === 'string' && (e.message.includes('429') || e.message.includes('Too Many Requests'))) {
-              setError('Rate limit reached. Please wait a moment before trying again.');
-              setIsRateLimited(true);
-              setTimeout(() => setIsRateLimited(false), RATE_LIMIT_COOLDOWN_MS);
-          } else {
-              setError('Could not fetch weather. The AI service may be temporarily unavailable.');
-          }
-        } finally {
-          setIsLoading(false);
-        }
-      },
-      () => {
-        setError('Could not get location. Please enable location services.');
-        setIsLoading(false);
+    try {
+      const result = await getWeather({ latitude, longitude });
+      result.locationName = name; // Override location name
+      const now = Date.now();
+      setWeatherData(result);
+      setLastUpdated(new Date(now));
+      sessionStorage.setItem(CACHE_KEY, JSON.stringify({ data: result, timestamp: now }));
+      setError(null);
+    } catch (e: any) {
+        if (typeof e.message === 'string' && (e.message.includes('429') || e.message.includes('Too Many Requests'))) {
+          setError('Rate limit reached. Please wait a moment before trying again.');
+          setIsRateLimited(true);
+          setTimeout(() => setIsRateLimited(false), RATE_LIMIT_COOLDOWN_MS);
+      } else {
+          setError('Could not fetch weather. The AI service may be temporarily unavailable.');
       }
-    );
+    } finally {
+      setIsLoading(false);
+    }
   }, []);
 
   useEffect(() => {
-    // Automatically fetch weather on initial load if no recent cached data exists
-    const cachedItem = sessionStorage.getItem(CACHE_KEY);
-    let shouldFetch = true;
-    if (cachedItem) {
-      const { timestamp } = JSON.parse(cachedItem) as CachedWeatherData;
-      if (Date.now() - timestamp < CACHE_DURATION_MS) {
-        shouldFetch = false;
-      }
-    }
-    if (shouldFetch) {
-      handleGetWeather(false);
-    } else {
-       const { data, timestamp } = JSON.parse(cachedItem!) as CachedWeatherData;
-       setWeatherData(data);
-       setLastUpdated(new Date(timestamp));
-       setIsLoading(false);
-    }
+    handleGetWeather(false);
   }, [handleGetWeather]);
 
 

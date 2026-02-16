@@ -7,6 +7,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Wind, Gauge, RefreshCw, AlertCircle, Loader2 } from 'lucide-react';
 import { getPollution, type GetPollutionOutput } from '@/ai/flows/get-pollution-flow';
 import { formatDistanceToNow } from 'date-fns';
+import { defaultLocation } from '@/lib/location';
 
 const CACHE_KEY = 'pollutionData';
 const CACHE_DURATION_MS = 5 * 60 * 1000; // 5 minutes
@@ -19,7 +20,7 @@ type CachedPollutionData = {
 
 export function PollutionCard() {
   const [pollutionData, setPollutionData] = useState<GetPollutionOutput | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const [isRateLimited, setIsRateLimited] = useState(false);
@@ -28,7 +29,6 @@ export function PollutionCard() {
     setIsLoading(true);
     setError(null);
 
-    // Skip location check if we have recent cached data and not forcing refresh
     const cachedItem = sessionStorage.getItem(CACHE_KEY);
     if (cachedItem && !forceRefresh) {
       const { data, timestamp } = JSON.parse(cachedItem) as CachedPollutionData;
@@ -40,58 +40,31 @@ export function PollutionCard() {
       }
     }
     
-    if (!navigator.geolocation) {
-      setError('Geolocation is not supported by your browser.');
-      setIsLoading(false);
-      return;
-    }
+    const { latitude, longitude, name } = defaultLocation;
 
-    navigator.geolocation.getCurrentPosition(
-      async (position) => {
-        const { latitude, longitude } = position.coords;
-
-        try {
-          const result = await getPollution({ latitude, longitude });
-          const now = Date.now();
-          setPollutionData(result);
-          setLastUpdated(new Date(now));
-          sessionStorage.setItem(CACHE_KEY, JSON.stringify({ data: result, timestamp: now }));
-          setError(null);
-        } catch (e: any) {
-           if (typeof e.message === 'string' && (e.message.includes('429') || e.message.includes('Too Many Requests'))) {
-              setError('Rate limit reached. Please wait a moment before trying again.');
-              setIsRateLimited(true);
-              setTimeout(() => setIsRateLimited(false), RATE_LIMIT_COOLDOWN_MS);
-          } else {
-              setError('Could not fetch air quality. The AI service may be temporarily unavailable.');
-          }
-        } finally {
-          setIsLoading(false);
-        }
-      },
-      () => {
-        setError('Could not get location. Please enable location services.');
-        setIsLoading(false);
+    try {
+      const result = await getPollution({ latitude, longitude });
+      result.locationName = name; // Override location name
+      const now = Date.now();
+      setPollutionData(result);
+      setLastUpdated(new Date(now));
+      sessionStorage.setItem(CACHE_KEY, JSON.stringify({ data: result, timestamp: now }));
+      setError(null);
+    } catch (e: any) {
+        if (typeof e.message === 'string' && (e.message.includes('429') || e.message.includes('Too Many Requests'))) {
+          setError('Rate limit reached. Please wait a moment before trying again.');
+          setIsRateLimited(true);
+          setTimeout(() => setIsRateLimited(false), RATE_LIMIT_COOLDOWN_MS);
+      } else {
+          setError('Could not fetch air quality. The AI service may be temporarily unavailable.');
       }
-    );
+    } finally {
+      setIsLoading(false);
+    }
   }, []);
   
   useEffect(() => {
-    // Automatically fetch on load if no valid cache
-     const cachedItem = sessionStorage.getItem(CACHE_KEY);
-    let shouldFetch = true;
-    if (cachedItem) {
-      const { data, timestamp } = JSON.parse(cachedItem) as CachedPollutionData;
-      if (Date.now() - timestamp < CACHE_DURATION_MS) {
-        setPollutionData(data);
-        setLastUpdated(new Date(timestamp));
-        shouldFetch = false;
-      }
-    }
-    if (shouldFetch) {
-      handleGetPollution(false);
-    }
-    setIsLoading(false);
+    handleGetPollution(false);
   }, [handleGetPollution]);
 
   const renderContent = () => {
