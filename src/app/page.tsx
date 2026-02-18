@@ -12,11 +12,13 @@ import { useMemo, useState, useEffect } from 'react';
 import { getDistance } from '@/lib/utils';
 import { WeatherCard } from '@/components/weather-card';
 import { PollutionCard } from '@/components/pollution-card';
+import { defaultLocation } from '@/lib/location';
 
 
 export default function Home() {
   const firestore = useFirestore();
-  const [userLocation, setUserLocation] = useState<{latitude: number, longitude: number} | null>(null);
+  // Initialize with default location for immediate "Krishnankovil" calculations
+  const [userLocation, setUserLocation] = useState<{latitude: number, longitude: number}>(defaultLocation);
 
   useEffect(() => {
     const handleLocationUpdate = (event: Event) => {
@@ -27,6 +29,9 @@ export default function Home() {
     const locationStr = sessionStorage.getItem('userLocation');
     if (locationStr) {
       setUserLocation(JSON.parse(locationStr));
+    } else {
+      // Fallback to default if nothing in session
+      setUserLocation(defaultLocation);
     }
 
     window.addEventListener('locationUpdated', handleLocationUpdate);
@@ -72,50 +77,46 @@ export default function Home() {
 
   const activeDrivers = useMemo(() => {
     if (!allAlerts) return 0;
-    // Count drivers from all alerts to show total network activity
     const uniqueDrivers = new Set(allAlerts.map(doc => doc.driver_name));
     return uniqueDrivers.size;
   }, [allAlerts]);
 
 
   return (
-      <div className="container mx-auto p-4 md:p-8">
-        <div className="space-y-8">
-          
-          <div className="text-center p-8 bg-card rounded-lg shadow-lg border animate-in fade-in-0 duration-500">
-            <h1 className="text-4xl font-bold tracking-tight">Welcome to V2V AlertCast</h1>
-            <p className="text-lg text-muted-foreground mt-2">The real-time, vehicle-to-vehicle safety network.</p>
-            <p className="text-muted-foreground">Stay aware. Stay connected.</p>
+      <div className="container mx-auto p-4 md:p-8 space-y-8 animate-in fade-in slide-in-from-bottom-2 duration-500">
+          <div className="text-center p-8 bg-card rounded-xl shadow-sm border border-border/50 bg-gradient-to-br from-card to-muted/20">
+            <h1 className="text-4xl font-bold tracking-tight bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">V2V AlertCast</h1>
+            <p className="text-lg text-muted-foreground mt-2 font-medium">Krishnankovil Hub Network</p>
+            <p className="text-sm text-muted-foreground/80 mt-1 italic">Real-time safety broadcasts for local drivers.</p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-            <Link href="/detailed-alert" className="transform transition-transform duration-300 hover:scale-105">
-                <Card className="h-full flex flex-col items-center justify-center text-center p-8 bg-primary/10 hover:bg-primary/20 cursor-pointer">
-                    <Send className="h-12 w-12 text-primary mb-4" />
-                    <CardTitle className="text-2xl">Broadcast a Quick Alert</CardTitle>
-                    <CardDescription>Send a templated alert with one tap.</CardDescription>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <Link href="/detailed-alert" className="group">
+                <Card className="h-full flex flex-col items-center justify-center text-center p-8 border-primary/20 bg-primary/5 hover:bg-primary/10 transition-all duration-300 hover:shadow-lg hover:-translate-y-1">
+                    <Send className="h-12 w-12 text-primary mb-4 group-hover:scale-110 transition-transform duration-300" />
+                    <CardTitle className="text-2xl">Quick Broadcast</CardTitle>
+                    <CardDescription>Send an instant safety alert to nearby drivers.</CardDescription>
                 </Card>
             </Link>
-            <Link href="/live-feed" className="transform transition-transform duration-300 hover:scale-105">
-                <Card className="h-full flex flex-col items-center justify-center text-center p-8 bg-accent/10 hover:bg-accent/20 cursor-pointer">
-                    <RadioTower className="h-12 w-12 text-accent mb-4" />
-                    <CardTitle className="text-2xl">View Live Feed</CardTitle>
-                    <CardDescription>See active alerts from drivers.</CardDescription>
+            <Link href="/live-feed" className="group">
+                <Card className="h-full flex flex-col items-center justify-center text-center p-8 border-accent/20 bg-accent/5 hover:bg-accent/10 transition-all duration-300 hover:shadow-lg hover:-translate-y-1">
+                    <RadioTower className="h-12 w-12 text-accent mb-4 group-hover:scale-110 transition-transform duration-300" />
+                    <CardTitle className="text-2xl">Live Network Feed</CardTitle>
+                    <CardDescription>Monitor active broadcasts and hazard reports.</CardDescription>
                 </Card>
             </Link>
           </div>
-
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
             <div className="lg:col-span-2 space-y-8">
-                <Card className="animate-in fade-in-0 delay-150 duration-500">
-                  <CardHeader>
-                    <CardTitle>Latest Alert</CardTitle>
+                <Card className="border-none shadow-none bg-transparent">
+                  <CardHeader className="px-0">
+                    <CardTitle>Latest Incident Report</CardTitle>
                     <CardDescription>The most recent broadcast on the network.</CardDescription>
                   </CardHeader>
-                  <CardContent>
+                  <CardContent className="px-0">
                     {isLoading ? (
-                      <div className="flex items-center space-x-4">
+                      <div className="flex items-center space-x-4 bg-card p-6 rounded-lg border">
                           <Skeleton className="h-12 w-12 rounded-full" />
                           <div className="space-y-2">
                             <Skeleton className="h-4 w-[250px]" />
@@ -125,45 +126,44 @@ export default function Home() {
                     ) : latestAlert ? (
                       <AlertCard alert={latestAlert} />
                     ) : (
-                      <div className="text-muted-foreground text-center py-8">No alerts on the network yet.</div>
+                      <div className="text-muted-foreground text-center py-12 bg-card rounded-lg border border-dashed">
+                        No active alerts in Krishnankovil.
+                      </div>
                     )}
                   </CardContent>
                 </Card>
             </div>
             
-            <div className="space-y-8">
+            <div className="space-y-6">
                 <WeatherCard />
                 <PollutionCard />
-                <Card className="animate-in fade-in-0 delay-300 duration-500">
-                    <CardHeader>
-                        <CardTitle>Network Overview</CardTitle>
+                <Card className="overflow-hidden border-border/50">
+                    <CardHeader className="bg-muted/30">
+                        <CardTitle className="text-lg">Network Vitals</CardTitle>
                     </CardHeader>
-                    <CardContent className="space-y-6">
-                        <div className="flex items-center gap-4">
-                        <div className="p-3 rounded-full bg-accent/10 text-accent">
-                            <AlertTriangle className="h-6 w-6" />
+                    <CardContent className="space-y-6 pt-6">
+                        <div className="flex items-center gap-4 group">
+                        <div className="p-3 rounded-xl bg-accent/10 text-accent group-hover:scale-110 transition-transform duration-300">
+                            <AlertTriangle className="h-5 w-5" />
                         </div>
                         <div>
                             <div className="text-2xl font-bold">{isLoading ? <Skeleton className="h-6 w-12" /> : totalAlertsToday}</div>
-                            <div className="text-sm text-muted-foreground">Alerts Today</div>
+                            <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Reports Today</div>
                         </div>
                         </div>
-                        <div className="flex items-center gap-4">
-                        <div className="p-3 rounded-full bg-primary/10 text-primary">
-                            <Users className="h-6 w-6" />
+                        <div className="flex items-center gap-4 group">
+                        <div className="p-3 rounded-xl bg-primary/10 text-primary group-hover:scale-110 transition-transform duration-300">
+                            <Users className="h-5 w-5" />
                         </div>
                         <div>
                             <div className="text-2xl font-bold">{isLoading ? <Skeleton className="h-6 w-12" /> : activeDrivers}</div>
-                            <div className="text-sm text-muted-foreground">Active Drivers</div>
+                            <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Connected Nodes</div>
                         </div>
                         </div>
                     </CardContent>
                 </Card>
             </div>
-
           </div>
-
-        </div>
       </div>
   );
 }

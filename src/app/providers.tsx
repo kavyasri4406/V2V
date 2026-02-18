@@ -8,6 +8,7 @@ import { usePathname } from 'next/navigation';
 import { AuthLayout } from '@/components/auth-layout';
 import { useState, useEffect } from 'react';
 import { SplashScreen } from '@/components/splash-screen';
+import { cn } from '@/lib/utils';
 
 export function AppProviders({
   children,
@@ -17,12 +18,14 @@ export function AppProviders({
   const pathname = usePathname();
   const isAuthPage = pathname === '/login';
   const [isLoading, setIsLoading] = useState(true);
+  const [isFadingOut, setIsFadingOut] = useState(false);
 
   useEffect(() => {
-    // This effect runs only once on the client
+    // Reduced splash screen time for a snappier "fast and smooth" feel
     const timer = setTimeout(() => {
-      setIsLoading(false);
-    }, 3000); // Show splash for 3 seconds
+      setIsFadingOut(true);
+      setTimeout(() => setIsLoading(false), 500); // Wait for fade animation
+    }, 1800); 
 
     return () => clearTimeout(timer);
   }, []);
@@ -30,14 +33,26 @@ export function AppProviders({
 
   return (
     <>
-        {isLoading && <SplashScreen />}
-        <div className={isLoading ? 'hidden' : ''}>
+        {isLoading && (
+          <div className={cn(
+            "fixed inset-0 z-[100] transition-opacity duration-500",
+            isFadingOut ? "opacity-0 pointer-events-none" : "opacity-100"
+          )}>
+            <SplashScreen />
+          </div>
+        )}
+        <div className={cn(
+          "transition-all duration-700",
+          isLoading ? 'opacity-0 scale-95 blur-sm' : 'opacity-100 scale-100 blur-0'
+        )}>
         <FirebaseClientProvider>
             {isAuthPage ? (
             <AuthLayout>{children}</AuthLayout>
             ) : (
             <MainLayout>
-                {children}
+                <div className="animate-in fade-in slide-in-from-bottom-4 duration-700 ease-out fill-mode-forwards">
+                  {children}
+                </div>
             </MainLayout>
             )}
         </FirebaseClientProvider>

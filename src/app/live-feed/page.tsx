@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState, useEffect } from 'react';
+import { useMemo, useState } from 'react';
 import { collection, query, orderBy, limit, Timestamp, getDocs, writeBatch } from 'firebase/firestore';
 import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
 import type { Alert } from '@/lib/types';
@@ -19,7 +19,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
-import { Trash2, Loader2 } from 'lucide-react';
+import { Trash2, Loader2, RadioTower } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import {
   Tooltip,
@@ -89,13 +89,16 @@ export default function LiveAlertFeedPage() {
   };
 
   return (
-      <div className="w-full max-w-4xl mx-auto">
-          <Card className="h-full">
-          <CardHeader className="flex flex-row items-start sm:items-center justify-between gap-2">
+      <div className="w-full max-w-4xl mx-auto space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+          <Card className="h-full border-none shadow-none bg-transparent">
+          <CardHeader className="flex flex-row items-start sm:items-center justify-between gap-2 px-0 pt-0">
               <div className="flex-1">
-                  <CardTitle>Live Alert Feed</CardTitle>
-                  <CardDescription>
-                    Showing all recent alerts from drivers on the network.
+                  <div className="flex items-center gap-2 mb-1">
+                    <RadioTower className="h-5 w-5 text-accent animate-pulse" />
+                    <CardTitle className="text-3xl">Live Feed</CardTitle>
+                  </div>
+                  <CardDescription className="text-base font-medium">
+                    Monitoring Krishnankovil and surrounding areas.
                   </CardDescription>
               </div>
               <div className="flex items-center gap-2">
@@ -104,14 +107,14 @@ export default function LiveAlertFeedPage() {
                     <Tooltip>
                       <TooltipTrigger asChild>
                         <AlertDialogTrigger asChild>
-                          <Button variant="destructive" size="icon" disabled={isLoading || isDeleting || (processedAlerts.length === 0 && !isLoading)}>
+                          <Button variant="outline" size="icon" className="text-destructive hover:bg-destructive hover:text-white" disabled={isLoading || isDeleting || (processedAlerts.length === 0 && !isLoading)}>
                             {isDeleting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
-                            <span className="sr-only">Clear All Alerts</span>
+                            <span className="sr-only">Clear All</span>
                           </Button>
                         </AlertDialogTrigger>
                       </TooltipTrigger>
                       <TooltipContent>
-                        <p>Clear All Alerts</p>
+                        <p>Wipe Network Feed</p>
                       </TooltipContent>
                     </Tooltip>
                   </TooltipProvider>
@@ -119,26 +122,25 @@ export default function LiveAlertFeedPage() {
                     <AlertDialogHeader>
                       <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
                       <AlertDialogDescription>
-                        This action cannot be undone. This will permanently delete all alerts
-                        from the network.
+                        This will permanently delete all active alerts from the network.
                       </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
                       <AlertDialogCancel>Cancel</AlertDialogCancel>
-                      <AlertDialogAction onClick={handleClearAlerts} disabled={isDeleting}>
+                      <AlertDialogAction onClick={handleClearAlerts} disabled={isDeleting} className="bg-destructive hover:bg-destructive/90 text-destructive-foreground">
                         {isDeleting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                        Continue
+                        Wipe Feed
                       </AlertDialogAction>
                     </AlertDialogFooter>
                   </AlertDialogContent>
                 </AlertDialog>
               </div>
           </CardHeader>
-          <CardContent className="pt-0">
+          <CardContent className="px-0 pt-4">
               <div className="space-y-4">
               {isLoading ? (
                   Array.from({ length: 5 }).map((_, i) => (
-                      <div className="flex items-center space-x-4 p-4" key={i}>
+                      <div className="flex items-center space-x-4 p-6 bg-card border rounded-xl" key={i}>
                           <Skeleton className="h-12 w-12 rounded-full" />
                           <div className="space-y-2">
                           <Skeleton className="h-4 w-[250px]" />
@@ -149,9 +151,12 @@ export default function LiveAlertFeedPage() {
               ) : processedAlerts.length > 0 ? (
                   processedAlerts.map((alert) => <AlertCard key={alert.id} alert={alert} />)
               ) : (
-                  <p className="text-muted-foreground text-center py-8">
-                    No recent alerts to display.
-                  </p>
+                  <div className="text-center py-20 bg-card rounded-2xl border-2 border-dashed border-muted flex flex-col items-center gap-4">
+                    <RadioTower className="h-12 w-12 text-muted-foreground/30" />
+                    <p className="text-muted-foreground font-medium text-lg">
+                      No recent alerts on the network.
+                    </p>
+                  </div>
               )}
               </div>
           </CardContent>
