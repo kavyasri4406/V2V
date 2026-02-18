@@ -86,7 +86,11 @@ export default function Home() {
       <div className="container mx-auto p-4 md:p-8 space-y-8 animate-in fade-in slide-in-from-bottom-2 duration-300">
           <div className="text-center p-8 bg-card rounded-xl shadow-sm border border-border/50 bg-gradient-to-br from-card to-muted/20">
             <h1 className="text-4xl font-bold tracking-tight bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">Welcome to V2V</h1>
-            <p className="text-sm text-muted-foreground/80 mt-1 italic">The real-time, Vehicle to Vehicle Communication. Stay aware. Stay connected.</p>
+            <p className="text-sm text-foreground mt-1 italic">
+              The real-time, Vehicle to Vehicle Communication.
+              <br />
+              Stay aware. Stay connected.
+            </p>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
