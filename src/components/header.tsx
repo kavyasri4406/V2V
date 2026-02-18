@@ -10,7 +10,7 @@ export default function Header() {
         <div className="mr-4 hidden md:flex">
           <CarFront className="mr-2 h-6 w-6 text-accent" />
           <h1 className="text-lg font-bold tracking-tight text-foreground font-headline">
-            V2V AlertCast
+            V2V
           </h1>
         </div>
         <div className="flex items-center md:hidden">
