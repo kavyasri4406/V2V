@@ -86,7 +86,6 @@ export default function Home() {
       <div className="container mx-auto p-4 md:p-8 space-y-8 animate-in fade-in slide-in-from-bottom-2 duration-300">
           <div className="text-center p-8 bg-card rounded-xl shadow-sm border border-border/50 bg-gradient-to-br from-card to-muted/20">
             <h1 className="text-4xl font-bold tracking-tight bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">V2V AlertCast</h1>
-            <p className="text-lg text-muted-foreground mt-2 font-medium">Krishnankovil Hub Network</p>
             <p className="text-sm text-muted-foreground/80 mt-1 italic">Real-time safety broadcasts for local drivers.</p>
           </div>
 
