@@ -18,6 +18,7 @@ export function AppProviders({
   const pathname = usePathname();
   const isAuthPage = pathname === '/login';
   
+  // High-speed transition state
   const [isLoading, setIsLoading] = useState(true);
   const [isFadingOut, setIsFadingOut] = useState(false);
   const [mounted, setMounted] = useState(false);
@@ -33,7 +34,7 @@ export function AppProviders({
       document.documentElement.classList.remove('dark');
     }
     
-    // High-speed transition sequence
+    // High-speed transition sequence: Total splash 250ms
     const fadeTimer = setTimeout(() => {
       setIsFadingOut(true);
     }, 100);
@@ -50,14 +51,15 @@ export function AppProviders({
 
   // Server-safe class generation to prevent hydration mismatches.
   // We use fixed duration values that are identical on server and client.
+  // We force the initial render to match the server exactly.
   const splashContainerClasses = cn(
     "fixed inset-0 z-[100] transition-opacity duration-150",
-    isFadingOut ? "opacity-0 pointer-events-none" : "opacity-100"
+    (mounted && isFadingOut) ? "opacity-0 pointer-events-none" : "opacity-100"
   );
 
   const contentWrapperClasses = cn(
     "transition-all duration-150",
-    isLoading ? 'opacity-0 scale-99 blur-sm' : 'opacity-100 scale-100 blur-0'
+    (!mounted || isLoading) ? 'opacity-0 scale-99 blur-sm' : 'opacity-100 scale-100 blur-0'
   );
 
   return (
