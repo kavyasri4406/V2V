@@ -17,7 +17,6 @@ import { defaultLocation } from '@/lib/location';
 
 export default function Home() {
   const firestore = useFirestore();
-  // Initialize with default location for immediate "Krishnankovil" calculations
   const [userLocation, setUserLocation] = useState<{latitude: number, longitude: number}>(defaultLocation);
 
   useEffect(() => {
@@ -30,7 +29,6 @@ export default function Home() {
     if (locationStr) {
       setUserLocation(JSON.parse(locationStr));
     } else {
-      // Fallback to default if nothing in session
       setUserLocation(defaultLocation);
     }
 
@@ -83,10 +81,10 @@ export default function Home() {
 
 
   return (
-      <div className="container mx-auto p-4 md:p-8 space-y-8 animate-in fade-in slide-in-from-bottom-2 duration-300">
+      <div className="container mx-auto p-4 md:p-8 space-y-8 animate-in fade-in duration-150">
           <div className="text-center p-8 bg-card rounded-xl shadow-sm border border-border/50 bg-gradient-to-br from-card to-muted/20">
             <h1 className="text-4xl font-bold tracking-tight bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">Welcome to V2V</h1>
-            <p className="text-sm text-foreground mt-1 italic">
+            <p className="text-sm text-foreground mt-1 italic whitespace-pre-line">
               The real-time, Vehicle to Vehicle Communication.
               <br />
               Stay aware. Stay connected.
@@ -95,15 +93,15 @@ export default function Home() {
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <Link href="/detailed-alert" className="group">
-                <Card className="h-full flex flex-col items-center justify-center text-center p-8 border-primary/20 bg-primary/5 hover:bg-primary/10 transition-all duration-200 hover:shadow-lg hover:-translate-y-1">
-                    <Send className="h-12 w-12 text-primary mb-4 group-hover:scale-110 transition-transform duration-200" />
+                <Card className="h-full flex flex-col items-center justify-center text-center p-8 border-primary/20 bg-primary/5 hover:bg-primary/10 transition-all duration-150 hover:shadow-lg hover:-translate-y-0.5">
+                    <Send className="h-12 w-12 text-primary mb-4 group-hover:scale-105 transition-transform duration-150" />
                     <CardTitle className="text-2xl">Quick Broadcast</CardTitle>
                     <CardDescription>Send an instant safety alert to nearby drivers.</CardDescription>
                 </Card>
             </Link>
             <Link href="/live-feed" className="group">
-                <Card className="h-full flex flex-col items-center justify-center text-center p-8 border-accent/20 bg-accent/5 hover:bg-accent/10 transition-all duration-200 hover:shadow-lg hover:-translate-y-1">
-                    <RadioTower className="h-12 w-12 text-accent mb-4 group-hover:scale-110 transition-transform duration-200" />
+                <Card className="h-full flex flex-col items-center justify-center text-center p-8 border-accent/20 bg-accent/5 hover:bg-accent/10 transition-all duration-150 hover:shadow-lg hover:-translate-y-0.5">
+                    <RadioTower className="h-12 w-12 text-accent mb-4 group-hover:scale-105 transition-transform duration-150" />
                     <CardTitle className="text-2xl">Live Network Feed</CardTitle>
                     <CardDescription>Monitor active broadcasts and hazard reports.</CardDescription>
                 </Card>
@@ -146,7 +144,7 @@ export default function Home() {
                     </CardHeader>
                     <CardContent className="space-y-6 pt-6">
                         <div className="flex items-center gap-4 group">
-                        <div className="p-3 rounded-xl bg-accent/10 text-accent group-hover:scale-110 transition-transform duration-200">
+                        <div className="p-3 rounded-xl bg-accent/10 text-accent group-hover:scale-105 transition-transform duration-150">
                             <AlertTriangle className="h-5 w-5" />
                         </div>
                         <div>
@@ -155,7 +153,7 @@ export default function Home() {
                         </div>
                         </div>
                         <div className="flex items-center gap-4 group">
-                        <div className="p-3 rounded-xl bg-primary/10 text-primary group-hover:scale-110 transition-transform duration-200">
+                        <div className="p-3 rounded-xl bg-primary/10 text-primary group-hover:scale-105 transition-transform duration-150">
                             <Users className="h-5 w-5" />
                         </div>
                         <div>

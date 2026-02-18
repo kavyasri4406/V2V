@@ -89,7 +89,7 @@ export default function LiveAlertFeedPage() {
   };
 
   return (
-      <div className="w-full max-w-4xl mx-auto space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
+      <div className="w-full max-w-4xl mx-auto space-y-6 animate-in fade-in duration-150">
           <Card className="h-full border-none shadow-none bg-transparent">
           <CardHeader className="flex flex-row items-start sm:items-center justify-between gap-2 px-0 pt-0">
               <div className="flex-1">
@@ -149,7 +149,7 @@ export default function LiveAlertFeedPage() {
                       </div>
                   ))
               ) : processedAlerts.length > 0 ? (
-                  processedAlerts.map((alert) => <AlertCard key={alert.id} alert={alert} />)
+                  processedAlerts.map((alert) => <AlertCard alert={alert} key={alert.id} />)
               ) : (
                   <div className="text-center py-20 bg-card rounded-2xl border-2 border-dashed border-muted flex flex-col items-center gap-4">
                     <RadioTower className="h-12 w-12 text-muted-foreground/30" />

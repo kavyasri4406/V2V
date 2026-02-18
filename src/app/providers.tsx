@@ -33,22 +33,23 @@ export function AppProviders({
       document.documentElement.classList.remove('dark');
     }
     
+    // Faster splash screen: 300ms delay instead of 800ms
     const timer = setTimeout(() => {
       setIsFadingOut(true);
-      setTimeout(() => setIsLoading(false), 300);
-    }, 800); 
+      setTimeout(() => setIsLoading(false), 200);
+    }, 300); 
 
     return () => clearTimeout(timer);
   }, []);
 
   const splashContainerClasses = cn(
-    "fixed inset-0 z-[100] transition-opacity duration-300",
+    "fixed inset-0 z-[100] transition-opacity duration-200",
     isFadingOut ? "opacity-0 pointer-events-none" : "opacity-100"
   );
 
   const contentWrapperClasses = cn(
-    "transition-all duration-300",
-    !isMounted || isLoading ? 'opacity-0 scale-98 blur-sm' : 'opacity-100 scale-100 blur-0'
+    "transition-all duration-200",
+    !isMounted || isLoading ? 'opacity-0 scale-99 blur-sm' : 'opacity-100 scale-100 blur-0'
   );
 
   return (
@@ -64,7 +65,7 @@ export function AppProviders({
               <AuthLayout>{children}</AuthLayout>
               ) : (
               <MainLayout>
-                  <div className="animate-in fade-in slide-in-from-bottom-2 duration-300 ease-out fill-mode-forwards">
+                  <div className="animate-in fade-in slide-in-from-bottom-1 duration-150 ease-out fill-mode-forwards">
                     {children}
                   </div>
               </MainLayout>
