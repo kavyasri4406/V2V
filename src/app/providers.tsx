@@ -20,10 +20,10 @@ export function AppProviders({
   
   const [isLoading, setIsLoading] = useState(true);
   const [isFadingOut, setIsFadingOut] = useState(false);
-  const [isMounted, setIsMounted] = useState(false);
+  const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
-    setIsMounted(true);
+    setMounted(true);
     
     // Apply theme on initial load
     const savedTheme = localStorage.getItem('theme');
@@ -33,25 +33,31 @@ export function AppProviders({
       document.documentElement.classList.remove('dark');
     }
     
-    // Ultra-fast splash screen transition
-    const timer = setTimeout(() => {
+    // High-speed transition sequence
+    const fadeTimer = setTimeout(() => {
       setIsFadingOut(true);
-      setTimeout(() => setIsLoading(false), 150);
-    }, 150); 
+    }, 100);
 
-    return () => clearTimeout(timer);
+    const loadTimer = setTimeout(() => {
+      setIsLoading(false);
+    }, 250);
+
+    return () => {
+      clearTimeout(fadeTimer);
+      clearTimeout(loadTimer);
+    };
   }, []);
 
-  // Hydration safety: These values MUST match the server's initial render.
-  // Server-side: isMounted=false, isLoading=true, isFadingOut=false.
+  // Server-safe class generation to prevent hydration mismatches.
+  // We use fixed duration values that are identical on server and client.
   const splashContainerClasses = cn(
-    "fixed inset-0 z-[100] transition-opacity duration-200",
+    "fixed inset-0 z-[100] transition-opacity duration-150",
     isFadingOut ? "opacity-0 pointer-events-none" : "opacity-100"
   );
 
   const contentWrapperClasses = cn(
-    "transition-all duration-200",
-    (!isMounted || isLoading) ? 'opacity-0 scale-99 blur-sm' : 'opacity-100 scale-100 blur-0'
+    "transition-all duration-150",
+    isLoading ? 'opacity-0 scale-99 blur-sm' : 'opacity-100 scale-100 blur-0'
   );
 
   return (
