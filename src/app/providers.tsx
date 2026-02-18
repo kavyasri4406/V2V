@@ -18,7 +18,7 @@ export function AppProviders({
   const pathname = usePathname();
   const isAuthPage = pathname === '/login';
   
-  // High-speed transition state
+  // State for ultra-fast splash sequence
   const [isLoading, setIsLoading] = useState(true);
   const [isFadingOut, setIsFadingOut] = useState(false);
   const [mounted, setMounted] = useState(false);
@@ -49,27 +49,27 @@ export function AppProviders({
     };
   }, []);
 
-  // Server-safe class generation to prevent hydration mismatches.
-  // We use fixed duration values that are identical on server and client.
-  // We force the initial render to match the server exactly.
-  const splashContainerClasses = cn(
-    "fixed inset-0 z-[100] transition-opacity duration-150",
-    (mounted && isFadingOut) ? "opacity-0 pointer-events-none" : "opacity-100"
-  );
+  // HYDRATION FIX: Define static initial classes that match the server-side output exactly.
+  // The server renders as if 'mounted' is false, 'isFadingOut' is false, and 'isLoading' is true.
+  const initialSplashClasses = "fixed inset-0 z-[100] transition-opacity duration-150 opacity-100";
+  const initialContentClasses = "transition-all duration-150 opacity-0 scale-99 blur-sm";
 
-  const contentWrapperClasses = cn(
-    "transition-all duration-150",
-    (!mounted || isLoading) ? 'opacity-0 scale-99 blur-sm' : 'opacity-100 scale-100 blur-0'
-  );
+  const splashClasses = mounted 
+    ? cn("fixed inset-0 z-[100] transition-opacity duration-150", isFadingOut ? "opacity-0 pointer-events-none" : "opacity-100")
+    : initialSplashClasses;
+
+  const contentClasses = mounted
+    ? cn("transition-all duration-150", isLoading ? 'opacity-0 scale-99 blur-sm' : 'opacity-100 scale-100 blur-0')
+    : initialContentClasses;
 
   return (
     <>
         {isLoading && (
-          <div className={splashContainerClasses}>
+          <div className={splashClasses}>
             <SplashScreen />
           </div>
         )}
-        <div className={contentWrapperClasses}>
+        <div className={contentClasses}>
           <FirebaseClientProvider>
               {isAuthPage ? (
               <AuthLayout>{children}</AuthLayout>

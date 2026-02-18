@@ -84,7 +84,7 @@ export default function Home() {
       <div className="container mx-auto p-4 md:p-8 space-y-8 animate-in fade-in duration-150">
           <div className="text-center p-8 bg-card rounded-xl shadow-sm border border-border/50 bg-gradient-to-br from-card to-muted/20">
             <h1 className="text-4xl font-bold tracking-tight bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">Welcome to V2V</h1>
-            <p className="text-sm text-foreground mt-1 italic whitespace-pre-line">
+            <p className="text-sm text-black dark:text-white/90 mt-1 italic whitespace-pre-line font-medium">
               The real-time, Vehicle to Vehicle Communication.
               <br />
               Stay aware. Stay connected.
