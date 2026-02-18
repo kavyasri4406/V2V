@@ -21,11 +21,11 @@ export function AppProviders({
   const [isFadingOut, setIsFadingOut] = useState(false);
 
   useEffect(() => {
-    // Reduced splash screen time for a snappier "fast and smooth" feel
+    // Significantly reduced splash screen time for immediate access
     const timer = setTimeout(() => {
       setIsFadingOut(true);
-      setTimeout(() => setIsLoading(false), 500); // Wait for fade animation
-    }, 1800); 
+      setTimeout(() => setIsLoading(false), 300); // Snappier fade
+    }, 800); 
 
     return () => clearTimeout(timer);
   }, []);
@@ -35,22 +35,22 @@ export function AppProviders({
     <>
         {isLoading && (
           <div className={cn(
-            "fixed inset-0 z-[100] transition-opacity duration-500",
+            "fixed inset-0 z-[100] transition-opacity duration-300",
             isFadingOut ? "opacity-0 pointer-events-none" : "opacity-100"
           )}>
             <SplashScreen />
           </div>
         )}
         <div className={cn(
-          "transition-all duration-700",
-          isLoading ? 'opacity-0 scale-95 blur-sm' : 'opacity-100 scale-100 blur-0'
+          "transition-all duration-300",
+          isLoading ? 'opacity-0 scale-98 blur-sm' : 'opacity-100 scale-100 blur-0'
         )}>
         <FirebaseClientProvider>
             {isAuthPage ? (
             <AuthLayout>{children}</AuthLayout>
             ) : (
             <MainLayout>
-                <div className="animate-in fade-in slide-in-from-bottom-4 duration-700 ease-out fill-mode-forwards">
+                <div className="animate-in fade-in slide-in-from-bottom-2 duration-300 ease-out fill-mode-forwards">
                   {children}
                 </div>
             </MainLayout>

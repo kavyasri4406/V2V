@@ -89,7 +89,7 @@ export default function LiveAlertFeedPage() {
   };
 
   return (
-      <div className="w-full max-w-4xl mx-auto space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+      <div className="w-full max-w-4xl mx-auto space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
           <Card className="h-full border-none shadow-none bg-transparent">
           <CardHeader className="flex flex-row items-start sm:items-center justify-between gap-2 px-0 pt-0">
               <div className="flex-1">
