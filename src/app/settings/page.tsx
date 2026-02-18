@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
-import { BellRing, BellOff, Volume2, User, Car, MapPin, Loader2 } from 'lucide-react';
+import { BellRing, BellOff, Volume2, User, Car, MapPin, Loader2, Moon, Sun } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -15,6 +15,7 @@ import { UserProfile } from '@/lib/types';
 
 export default function SettingsPage() {
   const [voiceEnabled, setVoiceEnabled] = useState(false);
+  const [isDarkMode, setIsDarkMode] = useState(false);
   const [driverName, setDriverName] = useState('');
   const [vehicleNumber, setVehicleNumber] = useState('');
   const [locationEnabled, setLocationEnabled] = useState(false);
@@ -34,6 +35,7 @@ export default function SettingsPage() {
     if (typeof window !== 'undefined') {
       setVoiceEnabled(localStorage.getItem('voiceAlertsEnabled') === 'true');
       setLocationEnabled(localStorage.getItem('locationEnabled') === 'true');
+      setIsDarkMode(localStorage.getItem('theme') === 'dark');
     }
   }, []);
 
@@ -52,6 +54,22 @@ export default function SettingsPage() {
       toast({
         title: `Voice alerts ${enabled ? 'enabled' : 'disabled'}.`,
         description: 'Your changes have been saved.',
+      });
+    }
+  };
+
+  const handleDarkModeToggle = (enabled: boolean) => {
+    setIsDarkMode(enabled);
+    if (typeof window !== 'undefined') {
+      const theme = enabled ? 'dark' : 'light';
+      localStorage.setItem('theme', theme);
+      if (enabled) {
+        document.documentElement.classList.add('dark');
+      } else {
+        document.documentElement.classList.remove('dark');
+      }
+      toast({
+        title: `${enabled ? 'Dark' : 'Light'} mode activated.`,
       });
     }
   };
@@ -149,6 +167,29 @@ export default function SettingsPage() {
             <Button onClick={handleInfoSave} disabled={isProfileLoading || isSaving || !user}>
                 {isSaving ? <Loader2 className="animate-spin" /> : 'Save Profile'}
             </Button>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Appearance</CardTitle>
+            <CardDescription>Customize how the app looks on your device.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex items-center justify-between rounded-lg border p-4">
+              <div className="flex items-center space-x-3">
+                {isDarkMode ? <Moon className="text-primary" /> : <Sun className="text-accent" />}
+                <div>
+                  <Label htmlFor="dark-mode" className="cursor-pointer">Dark Mode</Label>
+                  <p className="text-xs text-muted-foreground">Toggle between light and dark themes.</p>
+                </div>
+              </div>
+              <Switch
+                id="dark-mode"
+                checked={isDarkMode}
+                onCheckedChange={handleDarkModeToggle}
+              />
+            </div>
           </CardContent>
         </Card>
 

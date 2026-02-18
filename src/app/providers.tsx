@@ -18,7 +18,6 @@ export function AppProviders({
   const pathname = usePathname();
   const isAuthPage = pathname === '/login';
   
-  // Use consistent initial state for hydration
   const [isLoading, setIsLoading] = useState(true);
   const [isFadingOut, setIsFadingOut] = useState(false);
   const [isMounted, setIsMounted] = useState(false);
@@ -26,17 +25,22 @@ export function AppProviders({
   useEffect(() => {
     setIsMounted(true);
     
-    // Significantly reduced splash screen time for immediate access
+    // Apply theme on initial load
+    const savedTheme = localStorage.getItem('theme');
+    if (savedTheme === 'dark') {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
+    
     const timer = setTimeout(() => {
       setIsFadingOut(true);
-      setTimeout(() => setIsLoading(false), 300); // Snappier fade
+      setTimeout(() => setIsLoading(false), 300);
     }, 800); 
 
     return () => clearTimeout(timer);
   }, []);
 
-  // During SSR and initial hydration, we render the splash screen 
-  // with static classes to avoid mismatch.
   const splashContainerClasses = cn(
     "fixed inset-0 z-[100] transition-opacity duration-300",
     isFadingOut ? "opacity-0 pointer-events-none" : "opacity-100"
@@ -44,7 +48,7 @@ export function AppProviders({
 
   const contentWrapperClasses = cn(
     "transition-all duration-300",
-    isLoading ? 'opacity-0 scale-98 blur-sm' : 'opacity-100 scale-100 blur-0'
+    !isMounted || isLoading ? 'opacity-0 scale-98 blur-sm' : 'opacity-100 scale-100 blur-0'
   );
 
   return (
