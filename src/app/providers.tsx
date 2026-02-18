@@ -33,15 +33,17 @@ export function AppProviders({
       document.documentElement.classList.remove('dark');
     }
     
-    // Faster splash screen: 300ms delay instead of 800ms
+    // Ultra-fast splash screen transition
     const timer = setTimeout(() => {
       setIsFadingOut(true);
-      setTimeout(() => setIsLoading(false), 200);
-    }, 300); 
+      setTimeout(() => setIsLoading(false), 150);
+    }, 150); 
 
     return () => clearTimeout(timer);
   }, []);
 
+  // Hydration safety: These values MUST match the server's initial render.
+  // Server-side: isMounted=false, isLoading=true, isFadingOut=false.
   const splashContainerClasses = cn(
     "fixed inset-0 z-[100] transition-opacity duration-200",
     isFadingOut ? "opacity-0 pointer-events-none" : "opacity-100"
@@ -49,7 +51,7 @@ export function AppProviders({
 
   const contentWrapperClasses = cn(
     "transition-all duration-200",
-    !isMounted || isLoading ? 'opacity-0 scale-99 blur-sm' : 'opacity-100 scale-100 blur-0'
+    (!isMounted || isLoading) ? 'opacity-0 scale-99 blur-sm' : 'opacity-100 scale-100 blur-0'
   );
 
   return (
