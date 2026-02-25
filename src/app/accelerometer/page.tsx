@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
@@ -44,7 +45,7 @@ export default function AccelerometerPage() {
 
     const sensorRef = ref(database, 'car_kit/mpu6050_raw/gyroscope');
     
-    const handleData = onValue(sensorRef, (snapshot) => {
+    const unsubscribe = onValue(sensorRef, (snapshot) => {
       const val = snapshot.val();
       if (!val) return;
 
@@ -52,36 +53,42 @@ export default function AccelerometerPage() {
       const y = Number(val.y) || 0;
       const z = Number(val.z) || 0;
       
-      // Calculate magnitude for the chart
+      // Calculate magnitude
       const total = Math.sqrt(x * x + y * y + z * z);
       const time = new Date().toLocaleTimeString([], { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
 
       const newPoint = { time, x, y, z, total };
       setCurrent(newPoint);
       
-      // Update Peak G field using the highest of x, y, z as requested
+      // Update Peak G field using highest absolute axis value
       const highestAxis = Math.max(Math.abs(x), Math.abs(y), Math.abs(z));
       setMaxForceValue(prev => Math.max(prev, highestAxis));
 
       dataRef.current = [...dataRef.current, newPoint].slice(-30);
       setData([...dataRef.current]);
+    }, (error) => {
+      console.error("RTDB Error:", error);
+      toast({ 
+        variant: "destructive", 
+        title: "Connection Error", 
+        description: "Failed to read from car_kit path. Check your RTDB rules." 
+      });
     });
 
     return () => {
       off(sensorRef);
     };
-  }, [active, database]);
+  }, [active, database, toast]);
 
   const handleStart = () => {
     setActive(true);
     toast({ title: 'RTDB Connected', description: 'Monitoring live sensor data from car_kit.' });
   };
 
-  // UI mapping: 
-  // - Current G-force field using the x value
-  // - Peak G field using the highest axis value encountered
-  const currentGDisplay = current.x.toFixed(0);
-  const peakGDisplay = maxForceValue.toFixed(0);
+  const handleStop = () => {
+    setActive(false);
+    toast({ title: 'RTDB Disconnected', description: 'Monitoring paused.' });
+  };
 
   return (
     <div className="w-full max-w-5xl mx-auto space-y-6 animate-in fade-in duration-150">
@@ -93,11 +100,11 @@ export default function AccelerometerPage() {
         <Button 
           variant={active ? "destructive" : "default"} 
           size="lg" 
-          onClick={() => active ? setActive(false) : handleStart()}
+          onClick={() => active ? handleStop() : handleStart()}
           className="w-full md:w-auto"
         >
           {active ? <Zap className="mr-2 fill-current" /> : <Activity className="mr-2" />}
-          {active ? 'Disconnect' : 'Connect RTDB'}
+          {active ? 'Disconnect RTDB' : 'Connect RTDB'}
         </Button>
       </div>
 
@@ -111,7 +118,7 @@ export default function AccelerometerPage() {
               "text-6xl font-black mb-2 transition-colors duration-150",
               Math.abs(current.x) > 15000 ? "text-destructive" : "text-primary"
             )}>
-              {currentGDisplay}
+              {current.x.toFixed(0)}
             </div>
             <div className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Live X-Axis Value</div>
           </CardContent>
@@ -123,7 +130,7 @@ export default function AccelerometerPage() {
           </CardHeader>
           <CardContent className="flex flex-col items-center justify-center py-6">
             <div className="text-6xl font-black mb-2 text-accent">
-              {peakGDisplay}
+              {maxForceValue.toFixed(0)}
             </div>
             <div className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Max(X, Y, Z) Recorded</div>
           </CardContent>
@@ -214,7 +221,7 @@ export default function AccelerometerPage() {
         </CardContent>
       </Card>
       
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pb-8">
         <Card>
           <CardHeader>
             <CardTitle className="text-lg">Telemetric Logic</CardTitle>
@@ -222,29 +229,29 @@ export default function AccelerometerPage() {
           <CardContent className="text-sm text-muted-foreground space-y-4">
             <p>
               This dashboard is connected to the <strong>Firebase Realtime Database</strong>. 
-              It bypasses the local hardware accelerometer to provide insights from remote vehicle modules.
+              It streams raw vectors from the remote vehicle module.
             </p>
             <ul className="list-disc pl-5 space-y-2">
               <li><strong>Source:</strong> car_kit/mpu6050_raw/gyroscope</li>
-              <li><strong>Updates:</strong> Instant (Sub-100ms latency)</li>
-              <li><strong>Scaling:</strong> Raw values directly mapped from hardware.</li>
+              <li><strong>Updates:</strong> Real-time event stream</li>
+              <li><strong>Scaling:</strong> Raw sensor units.</li>
             </ul>
           </CardContent>
         </Card>
         
         <Card>
           <CardHeader>
-            <CardTitle className="text-lg text-destructive">Collision Logic</CardTitle>
+            <CardTitle className="text-lg text-destructive">Impact Detection</CardTitle>
           </CardHeader>
           <CardContent className="text-sm text-muted-foreground space-y-4">
             <p>
-              Automated collision broadcasts monitor the magnitude of these raw vectors.
+              The system monitors all three axes simultaneously to identify potential collisions.
             </p>
             <p className="bg-muted p-3 rounded-lg font-mono text-xs">
-              IF highest_axis > threshold THEN trigger_V2V_broadcast()
+              IF abs(any_axis) {">"} threshold THEN trigger_network_alert()
             </p>
             <p>
-              This ensures that the entire V2V network is informed if any remote vehicle experiences a high-G impact event.
+              Peak G tracks the single highest displacement encountered since connection.
             </p>
           </CardContent>
         </Card>
