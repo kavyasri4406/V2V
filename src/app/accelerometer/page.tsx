@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Activity, ShieldAlert, AlertTriangle, Zap, Info, Gauge, ArrowRightLeft, MoveVertical, MoveHorizontal } from 'lucide-react';
+import { Activity, Zap, Gauge, ArrowRightLeft, MoveVertical, MoveHorizontal, RefreshCcw } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useFirebase, errorEmitter } from '@/firebase';
 import { ref, onValue, off } from 'firebase/database';
@@ -28,9 +28,12 @@ export default function AccelerometerPage() {
   const [data, setData] = useState<AccelPoint[]>([]);
   const [current, setCurrent] = useState<AccelPoint>({ time: '', x: 0, y: 0, z: 0, total: 0 });
   const [maxForceValue, setMaxForceValue] = useState(0);
+  const [speed, setSpeed] = useState(0);
+  
   const { toast } = useToast();
   const { database } = useFirebase();
   const dataRef = useRef<AccelPoint[]>([]);
+  const lastTimeRef = useRef<number>(Date.now());
 
   const chartConfig = {
     x: { label: "X-Axis", color: "hsl(var(--primary))" },
@@ -42,8 +45,8 @@ export default function AccelerometerPage() {
   useEffect(() => {
     if (!active || !database) return;
 
-    // Connect to the Realtime Database path provided
-    const sensorRef = ref(database, 'car_kit/mpu6050_raw/gyroscope');
+    // Connect to the accelerometer path provided
+    const sensorRef = ref(database, 'car_kit/mpu6050_raw/accelerometer');
     
     const unsubscribe = onValue(sensorRef, (snapshot) => {
       const val = snapshot.val();
@@ -56,6 +59,24 @@ export default function AccelerometerPage() {
       
       // Calculate magnitude
       const total = Math.sqrt(x * x + y * y + z * z);
+      const now = Date.now();
+      const dt = (now - lastTimeRef.current) / 1000; // seconds
+      lastTimeRef.current = now;
+
+      // Calculate speed estimate (simple integration)
+      // Assuming units are m/s^2. We subtract gravity (approx 9.81) for magnitude
+      const gravity = 9.81;
+      const netAccel = Math.abs(total - gravity);
+      
+      setSpeed(prev => {
+        // If acceleration is very low, we assume stationary to handle noise drift
+        if (netAccel < 0.2) return prev * 0.98; // slow decay
+        
+        const deltaV = netAccel * dt * 3.6; // convert m/s to km/h
+        const newSpeed = prev + deltaV;
+        return Math.max(0, newSpeed);
+      });
+
       const time = new Date().toLocaleTimeString([], { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
 
       const newPoint = { time, x, y, z, total };
@@ -79,7 +100,8 @@ export default function AccelerometerPage() {
 
   const handleStart = () => {
     setActive(true);
-    toast({ title: 'Telemetry Active', description: 'Connected to vehicle Realtime Database.' });
+    lastTimeRef.current = Date.now();
+    toast({ title: 'Telemetry Active', description: 'Monitoring bike speed and dynamics.' });
   };
 
   const handleStop = () => {
@@ -87,113 +109,148 @@ export default function AccelerometerPage() {
     toast({ title: 'Stream Paused', description: 'Monitoring disconnected.' });
   };
 
+  const resetSpeed = () => {
+    setSpeed(0);
+    toast({ title: 'Speed Reset', description: 'Odometer zeroed.' });
+  };
+
   return (
-    <div className="w-full max-w-6xl mx-auto space-y-8 animate-in fade-in duration-150">
+    <div className="w-full max-w-6xl mx-auto space-y-6 animate-in fade-in duration-150">
+      {/* Bike Digital Speedometer Header */}
+      <Card className="bg-black text-primary border-primary/20 shadow-2xl overflow-hidden relative group">
+        <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent pointer-events-none" />
+        <CardContent className="p-8 flex flex-col items-center justify-center text-center">
+           <div className="flex items-center gap-2 mb-2 text-[10px] font-black uppercase tracking-[0.2em] text-primary/60">
+             <Gauge className="h-3 w-3" />
+             Live Velocity
+           </div>
+           <div className="relative">
+             <span className="text-8xl md:text-9xl font-black tabular-nums tracking-tighter italic">
+               {speed.toFixed(0)}
+             </span>
+             <span className="text-2xl md:text-3xl font-bold ml-2 italic opacity-80 uppercase tracking-widest text-primary/80">
+               km/h
+             </span>
+           </div>
+           <div className="mt-4 flex gap-4">
+              <div className="px-3 py-1 rounded bg-primary/10 border border-primary/20 text-[10px] font-bold uppercase tracking-widest">
+                Sensor: MPU6050
+              </div>
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                onClick={resetSpeed}
+                className="h-auto p-0 text-primary/40 hover:text-primary transition-colors"
+              >
+                <RefreshCcw className="h-3 w-3 mr-1" />
+                <span className="text-[10px] font-bold uppercase tracking-widest">Reset</span>
+              </Button>
+           </div>
+        </CardContent>
+      </Card>
+
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
         <div>
-          <div className="flex items-center gap-3 mb-2">
-            <div className="p-2 rounded-lg bg-primary/10 text-primary">
-               <Gauge className="h-6 w-6" />
-            </div>
-            <h1 className="text-4xl font-black tracking-tighter uppercase italic">Vehicle Dynamics</h1>
+          <div className="flex items-center gap-3 mb-1">
+            <h1 className="text-2xl font-black tracking-tighter uppercase italic">Vehicle Dynamics</h1>
           </div>
-          <p className="text-muted-foreground font-medium">Real-time G-force monitoring via car_kit hardware.</p>
+          <p className="text-muted-foreground text-xs font-medium">Real-time G-force monitoring via car_kit hardware.</p>
         </div>
-        <Button 
-          variant={active ? "destructive" : "default"} 
-          size="lg" 
-          onClick={() => active ? handleStop() : handleStart()}
-          className="w-full md:w-auto font-bold uppercase tracking-widest px-8 shadow-lg"
-        >
-          {active ? <Zap className="mr-2 fill-current" /> : <Activity className="mr-2" />}
-          {active ? 'Stop Monitoring' : 'Start Monitoring'}
-        </Button>
+        <div className="flex gap-2 w-full md:w-auto">
+          <Button 
+            variant={active ? "destructive" : "default"} 
+            size="lg" 
+            onClick={() => active ? handleStop() : handleStart()}
+            className="flex-1 md:flex-none font-bold uppercase tracking-widest px-8 shadow-lg"
+          >
+            {active ? <Zap className="mr-2 fill-current" /> : <Activity className="mr-2" />}
+            {active ? 'Stop' : 'Start'}
+          </Button>
+        </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Longitudinal (X) */}
         <Card className="bg-card border-border/40 shadow-sm">
-          <CardHeader className="pb-2">
+          <CardHeader className="pb-1 pt-4">
             <div className="flex items-center gap-2">
-              <MoveHorizontal className="h-4 w-4 text-primary" />
-              <CardTitle className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">X-Axis (Long)</CardTitle>
+              <MoveHorizontal className="h-3 w-3 text-primary" />
+              <CardTitle className="text-[9px] font-black uppercase tracking-widest text-muted-foreground">Longitudinal (X)</CardTitle>
             </div>
           </CardHeader>
           <CardContent>
-            <div className="text-5xl font-black tabular-nums text-primary">
-              {current.x.toFixed(0)}
+            <div className="text-4xl font-black tabular-nums text-primary">
+              {current.x.toFixed(1)}
             </div>
-            <p className="text-[10px] font-bold text-muted-foreground/60 mt-2 uppercase">Current G-Force</p>
+            <p className="text-[9px] font-bold text-muted-foreground/60 mt-1 uppercase">m/s²</p>
           </CardContent>
         </Card>
 
         {/* Lateral (Y) */}
         <Card className="bg-card border-border/40 shadow-sm">
-          <CardHeader className="pb-2">
+          <CardHeader className="pb-1 pt-4">
             <div className="flex items-center gap-2">
-              <ArrowRightLeft className="h-4 w-4 text-accent" />
-              <CardTitle className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Y-Axis (Lat)</CardTitle>
+              <ArrowRightLeft className="h-3 w-3 text-accent" />
+              <CardTitle className="text-[9px] font-black uppercase tracking-widest text-muted-foreground">Lateral (Y)</CardTitle>
             </div>
           </CardHeader>
           <CardContent>
-            <div className="text-5xl font-black tabular-nums text-accent">
-              {current.y.toFixed(0)}
+            <div className="text-4xl font-black tabular-nums text-accent">
+              {current.y.toFixed(1)}
             </div>
-            <p className="text-[10px] font-bold text-muted-foreground/60 mt-2 uppercase">Lateral Intensity</p>
+            <p className="text-[9px] font-bold text-muted-foreground/60 mt-1 uppercase">m/s²</p>
           </CardContent>
         </Card>
 
         {/* Vertical (Z) */}
         <Card className="bg-card border-border/40 shadow-sm">
-          <CardHeader className="pb-2">
+          <CardHeader className="pb-1 pt-4">
             <div className="flex items-center gap-2">
-              <MoveVertical className="h-4 w-4 text-chart-1" />
-              <CardTitle className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Z-Axis (Vert)</CardTitle>
+              <MoveVertical className="h-3 w-3 text-chart-1" />
+              <CardTitle className="text-[9px] font-black uppercase tracking-widest text-muted-foreground">Vertical (Z)</CardTitle>
             </div>
           </CardHeader>
           <CardContent>
-            <div className="text-5xl font-black tabular-nums text-chart-1">
-              {current.z.toFixed(0)}
+            <div className="text-4xl font-black tabular-nums text-chart-1">
+              {current.z.toFixed(1)}
             </div>
-            <p className="text-[10px] font-bold text-muted-foreground/60 mt-2 uppercase">Vertical Force</p>
+            <p className="text-[9px] font-bold text-muted-foreground/60 mt-1 uppercase">m/s²</p>
           </CardContent>
         </Card>
 
         {/* Peak Session G */}
         <Card className="bg-card border-border/40 shadow-sm">
-          <CardHeader className="pb-2">
+          <CardHeader className="pb-1 pt-4">
             <div className="flex items-center gap-2">
-              <Activity className="h-4 w-4 text-foreground" />
-              <CardTitle className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Peak G</CardTitle>
+              <Activity className="h-3 w-3 text-foreground" />
+              <CardTitle className="text-[9px] font-black uppercase tracking-widest text-muted-foreground">Peak Impact</CardTitle>
             </div>
           </CardHeader>
           <CardContent>
-            <div className="text-5xl font-black tabular-nums text-foreground">
-              {maxForceValue.toFixed(0)}
+            <div className="text-4xl font-black tabular-nums text-foreground">
+              {maxForceValue.toFixed(1)}
             </div>
-            <p className="text-[10px] font-bold text-muted-foreground/60 mt-2 uppercase">Highest Session Value</p>
+            <p className="text-[9px] font-bold text-muted-foreground/60 mt-1 uppercase">Max m/s²</p>
           </CardContent>
         </Card>
       </div>
 
       <Card className="border-border/40 shadow-lg">
-        <CardHeader className="flex flex-row items-center justify-between">
+        <CardHeader className="flex flex-row items-center justify-between pb-2">
           <div>
-            <CardTitle className="text-sm font-black uppercase tracking-widest">Telemetry Waveform</CardTitle>
-            <CardDescription>Multi-axis displacement over time from Realtime Database</CardDescription>
+            <CardTitle className="text-[10px] font-black uppercase tracking-widest">Telemetry Waveform</CardTitle>
           </div>
           {active && (
-            <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-green-500/10 text-green-500 text-[10px] font-black uppercase tracking-widest">
-              <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+            <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-green-500/10 text-green-500 text-[9px] font-black uppercase tracking-widest">
+              <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
               Live Link
             </div>
           )}
         </CardHeader>
-        <CardContent className="h-[400px] pt-4">
+        <CardContent className="h-[300px] pt-4">
           {!active ? (
-            <div className="h-full w-full border-2 border-dashed rounded-xl flex flex-col items-center justify-center text-muted-foreground/40 gap-3">
-              <Info className="h-10 w-10 opacity-20" />
-              <p className="text-xs font-bold uppercase tracking-widest">Awaiting Realtime Link...</p>
+            <div className="h-full w-full border border-dashed rounded-xl flex flex-col items-center justify-center text-muted-foreground/40 gap-3">
+              <p className="text-[10px] font-bold uppercase tracking-[0.2em]">Awaiting Realtime Link...</p>
             </div>
           ) : (
             <ChartContainer config={chartConfig} className="h-full w-full">
@@ -203,10 +260,10 @@ export default function AccelerometerPage() {
                   dataKey="time" 
                   axisLine={false} 
                   tickLine={false} 
-                  fontSize={10} 
+                  fontSize={9} 
                   interval="preserveStartEnd" 
                 />
-                <YAxis axisLine={false} tickLine={false} fontSize={10} />
+                <YAxis axisLine={false} tickLine={false} fontSize={9} />
                 <ChartTooltip content={<ChartTooltipContent />} />
                 <Line type="monotone" dataKey="x" stroke="var(--color-x)" strokeWidth={2} dot={false} isAnimationActive={false} />
                 <Line type="monotone" dataKey="y" stroke="var(--color-y)" strokeWidth={2} dot={false} isAnimationActive={false} />
