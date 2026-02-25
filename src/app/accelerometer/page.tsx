@@ -1,16 +1,18 @@
 'use client';
 
-import { useState, useEffect, useRef, useMemo } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Activity, ShieldAlert, AlertTriangle, Zap, Info } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { useFirebase } from '@/firebase';
+import { ref, onValue, off } from 'firebase/database';
 import {
   ChartContainer,
   ChartTooltip,
   ChartTooltipContent,
 } from "@/components/ui/chart";
-import { Line, LineChart, ResponsiveContainer, XAxis, YAxis, CartesianGrid } from "recharts";
+import { Line, LineChart, XAxis, YAxis, CartesianGrid } from "recharts";
 import { cn } from '@/lib/utils';
 
 type AccelPoint = {
@@ -25,8 +27,9 @@ export default function AccelerometerPage() {
   const [active, setActive] = useState(false);
   const [data, setData] = useState<AccelPoint[]>([]);
   const [current, setCurrent] = useState<AccelPoint>({ time: '', x: 0, y: 0, z: 0, total: 0 });
-  const [maxForce, setMaxForce] = useState(0);
+  const [maxForceValue, setMaxForceValue] = useState(0);
   const { toast } = useToast();
+  const { database } = useFirebase();
   const dataRef = useRef<AccelPoint[]>([]);
 
   const chartConfig = {
@@ -36,57 +39,56 @@ export default function AccelerometerPage() {
     total: { label: "Magnitude", color: "hsl(var(--foreground))" },
   };
 
-  const handleStart = async () => {
-    if (typeof DeviceMotionEvent !== 'undefined' && (DeviceMotionEvent as any).requestPermission) {
-      try {
-        const permission = await (DeviceMotionEvent as any).requestPermission();
-        if (permission !== 'granted') {
-          toast({ variant: 'destructive', title: 'Permission Denied', description: 'Motion sensors are required for this page.' });
-          return;
-        }
-      } catch (e) {
-        console.error(e);
-      }
-    }
-    setActive(true);
-    toast({ title: 'Sensors Active', description: 'Monitoring real-time motion data.' });
-  };
-
   useEffect(() => {
-    if (!active) return;
+    if (!active || !database) return;
 
-    const handleMotion = (event: DeviceMotionEvent) => {
-      const accel = event.accelerationIncludingGravity;
-      if (!accel) return;
+    const sensorRef = ref(database, 'car_kit/mpu6050_raw/gyroscope');
+    
+    const handleData = onValue(sensorRef, (snapshot) => {
+      const val = snapshot.val();
+      if (!val) return;
 
-      const x = accel.x || 0;
-      const y = accel.y || 0;
-      const z = accel.z || 0;
+      const x = Number(val.x) || 0;
+      const y = Number(val.y) || 0;
+      const z = Number(val.z) || 0;
+      
+      // Calculate magnitude for the chart
       const total = Math.sqrt(x * x + y * y + z * z);
       const time = new Date().toLocaleTimeString([], { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
 
       const newPoint = { time, x, y, z, total };
       setCurrent(newPoint);
       
-      if (total > maxForce) setMaxForce(total);
+      // Update Peak G field using the highest of x, y, z as requested
+      const highestAxis = Math.max(Math.abs(x), Math.abs(y), Math.abs(z));
+      setMaxForceValue(prev => Math.max(prev, highestAxis));
 
       dataRef.current = [...dataRef.current, newPoint].slice(-30);
-      setData(dataRef.current);
+      setData([...dataRef.current]);
+    });
+
+    return () => {
+      off(sensorRef);
     };
+  }, [active, database]);
 
-    window.addEventListener('devicemotion', handleMotion);
-    return () => window.removeEventListener('devicemotion', handleMotion);
-  }, [active, maxForce]);
+  const handleStart = () => {
+    setActive(true);
+    toast({ title: 'RTDB Connected', description: 'Monitoring live sensor data from car_kit.' });
+  };
 
-  const gForce = (current.total / 9.81).toFixed(2);
-  const maxGForce = (maxForce / 9.81).toFixed(2);
+  // UI mapping: 
+  // - Current G-force field using the x value
+  // - Peak G field using the highest axis value encountered
+  const currentGDisplay = current.x.toFixed(0);
+  const peakGDisplay = maxForceValue.toFixed(0);
 
   return (
     <div className="w-full max-w-5xl mx-auto space-y-6 animate-in fade-in duration-150">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">V2V Diagnostics</h1>
-          <p className="text-muted-foreground">Real-time accelerometer and impact monitoring.</p>
+          <p className="text-muted-foreground">Real-time RTDB sensor monitoring (car_kit).</p>
         </div>
         <Button 
           variant={active ? "destructive" : "default"} 
@@ -95,35 +97,35 @@ export default function AccelerometerPage() {
           className="w-full md:w-auto"
         >
           {active ? <Zap className="mr-2 fill-current" /> : <Activity className="mr-2" />}
-          {active ? 'Stop Monitoring' : 'Start Sensors'}
+          {active ? 'Disconnect' : 'Connect RTDB'}
         </Button>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <Card className="md:col-span-1">
           <CardHeader>
-            <CardTitle className="text-sm font-medium">Real-time G-Force</CardTitle>
+            <CardTitle className="text-sm font-medium">Current G-Force (X)</CardTitle>
           </CardHeader>
           <CardContent className="flex flex-col items-center justify-center py-6">
             <div className={cn(
               "text-6xl font-black mb-2 transition-colors duration-150",
-              parseFloat(gForce) > 2.0 ? "text-destructive" : "text-primary"
+              Math.abs(current.x) > 15000 ? "text-destructive" : "text-primary"
             )}>
-              {gForce}
+              {currentGDisplay}
             </div>
-            <div className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Current G</div>
+            <div className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Live X-Axis Value</div>
           </CardContent>
         </Card>
 
         <Card className="md:col-span-1">
           <CardHeader>
-            <CardTitle className="text-sm font-medium">Peak Impact</CardTitle>
+            <CardTitle className="text-sm font-medium">Peak G Encountered</CardTitle>
           </CardHeader>
           <CardContent className="flex flex-col items-center justify-center py-6">
             <div className="text-6xl font-black mb-2 text-accent">
-              {maxGForce}
+              {peakGDisplay}
             </div>
-            <div className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Highest G Recorded</div>
+            <div className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Max(X, Y, Z) Recorded</div>
           </CardContent>
         </Card>
 
@@ -135,16 +137,16 @@ export default function AccelerometerPage() {
             {active ? (
               <div className="flex items-center gap-2 text-green-500 font-bold">
                 <ShieldAlert className="animate-pulse" />
-                ACTIVE
+                LIVE
               </div>
             ) : (
               <div className="flex items-center gap-2 text-muted-foreground font-bold">
                 <AlertTriangle />
-                STANDBY
+                OFFLINE
               </div>
             )}
             <p className="text-[10px] text-center text-muted-foreground mt-2">
-              Impact threshold set at 2.5G for automatic collision broadcasting.
+              Streaming from car_kit/mpu6050_raw/gyroscope.
             </p>
           </CardContent>
         </Card>
@@ -153,13 +155,13 @@ export default function AccelerometerPage() {
       <Card>
         <CardHeader>
           <CardTitle>Motion Waveform</CardTitle>
-          <CardDescription>Visualizing acceleration across all axes (m/s²)</CardDescription>
+          <CardDescription>Live telemetry from Realtime Database</CardDescription>
         </CardHeader>
         <CardContent className="h-[350px] pt-4">
           {!active ? (
             <div className="h-full w-full border-2 border-dashed rounded-xl flex flex-col items-center justify-center text-muted-foreground gap-2">
               <Info className="h-8 w-8 opacity-20" />
-              <p>Sensors are currently in standby. Click 'Start Sensors' above.</p>
+              <p>RTDB is disconnected. Click 'Connect RTDB' above.</p>
             </div>
           ) : (
             <ChartContainer config={chartConfig} className="h-full w-full">
@@ -215,17 +217,17 @@ export default function AccelerometerPage() {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <Card>
           <CardHeader>
-            <CardTitle className="text-lg">How it works</CardTitle>
+            <CardTitle className="text-lg">Telemetric Logic</CardTitle>
           </CardHeader>
           <CardContent className="text-sm text-muted-foreground space-y-4">
             <p>
-              Your device's internal <strong>accelerometer</strong> measures acceleration forces in three dimensions. 
-              The V2V system uses these measurements to calculate the <strong>vector magnitude</strong> (total force).
+              This dashboard is connected to the <strong>Firebase Realtime Database</strong>. 
+              It bypasses the local hardware accelerometer to provide insights from remote vehicle modules.
             </p>
             <ul className="list-disc pl-5 space-y-2">
-              <li><strong>X-Axis:</strong> Side-to-side motion (yaw/swerve).</li>
-              <li><strong>Y-Axis:</strong> Forward/Backward motion (braking/acceleration).</li>
-              <li><strong>Z-Axis:</strong> Vertical motion (bumps/potholes).</li>
+              <li><strong>Source:</strong> car_kit/mpu6050_raw/gyroscope</li>
+              <li><strong>Updates:</strong> Instant (Sub-100ms latency)</li>
+              <li><strong>Scaling:</strong> Raw values directly mapped from hardware.</li>
             </ul>
           </CardContent>
         </Card>
@@ -236,13 +238,13 @@ export default function AccelerometerPage() {
           </CardHeader>
           <CardContent className="text-sm text-muted-foreground space-y-4">
             <p>
-              When the total force exceeds <strong>25 m/s²</strong> (approx 2.5G), the system assumes a potential high-impact event has occurred.
+              Automated collision broadcasts monitor the magnitude of these raw vectors.
             </p>
             <p className="bg-muted p-3 rounded-lg font-mono text-xs">
-              IF magnitude > threshold THEN trigger_emergency_broadcast()
+              IF highest_axis > threshold THEN trigger_V2V_broadcast()
             </p>
             <p>
-              This automation ensures that even if a driver is incapacitated, their vehicle can still alert others to the hazard.
+              This ensures that the entire V2V network is informed if any remote vehicle experiences a high-G impact event.
             </p>
           </CardContent>
         </Card>
