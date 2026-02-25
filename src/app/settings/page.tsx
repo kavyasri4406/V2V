@@ -1,10 +1,11 @@
+
 'use client';
 
 import { useState, useEffect } from 'react';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
-import { BellRing, BellOff, Volume2, User, Car, MapPin, Loader2, Moon, Sun } from 'lucide-react';
+import { BellRing, BellOff, Volume2, User, Car, MapPin, Loader2, Moon, Sun, Activity } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -19,6 +20,7 @@ export default function SettingsPage() {
   const [driverName, setDriverName] = useState('');
   const [vehicleNumber, setVehicleNumber] = useState('');
   const [locationEnabled, setLocationEnabled] = useState(false);
+  const [collisionDetectionEnabled, setCollisionDetectionEnabled] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const { toast } = useToast();
   const { user } = useUser();
@@ -35,6 +37,7 @@ export default function SettingsPage() {
     if (typeof window !== 'undefined') {
       setVoiceEnabled(localStorage.getItem('voiceAlertsEnabled') === 'true');
       setLocationEnabled(localStorage.getItem('locationEnabled') === 'true');
+      setCollisionDetectionEnabled(localStorage.getItem('collisionDetectionEnabled') === 'true');
       setIsDarkMode(localStorage.getItem('theme') === 'dark');
     }
   }, []);
@@ -51,10 +54,7 @@ export default function SettingsPage() {
     if (typeof window !== 'undefined') {
       localStorage.setItem('voiceAlertsEnabled', String(enabled));
       window.dispatchEvent(new Event('storage'));
-      toast({
-        title: `Voice alerts ${enabled ? 'enabled' : 'disabled'}.`,
-        description: 'Your changes have been saved.',
-      });
+      toast({ title: `Voice alerts ${enabled ? 'enabled' : 'disabled'}.` });
     }
   };
 
@@ -68,9 +68,7 @@ export default function SettingsPage() {
       } else {
         document.documentElement.classList.remove('dark');
       }
-      toast({
-        title: `${enabled ? 'Dark' : 'Light'} mode activated.`,
-      });
+      toast({ title: `${enabled ? 'Dark' : 'Light'} mode activated.` });
     }
   };
 
@@ -79,9 +77,28 @@ export default function SettingsPage() {
     if (typeof window !== 'undefined') {
       localStorage.setItem('locationEnabled', String(enabled));
       window.dispatchEvent(new Event('storage'));
-      toast({
-        title: `Location sharing ${enabled ? 'enabled' : 'disabled'}.`,
-      });
+      toast({ title: `Location sharing ${enabled ? 'enabled' : 'disabled'}.` });
+    }
+  };
+
+  const handleCollisionToggle = async (enabled: boolean) => {
+    if (enabled && typeof DeviceMotionEvent !== 'undefined' && (DeviceMotionEvent as any).requestPermission) {
+      try {
+        const permission = await (DeviceMotionEvent as any).requestPermission();
+        if (permission !== 'granted') {
+          toast({ variant: 'destructive', title: 'Permission Denied', description: 'Motion sensor access is required for collision detection.' });
+          return;
+        }
+      } catch (e) {
+        console.error('Permission request failed', e);
+      }
+    }
+    
+    setCollisionDetectionEnabled(enabled);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('collisionDetectionEnabled', String(enabled));
+      window.dispatchEvent(new Event('storage'));
+      toast({ title: `Collision detection ${enabled ? 'enabled' : 'disabled'}.` });
     }
   };
   
@@ -94,38 +111,16 @@ export default function SettingsPage() {
     const profileData = { driverName, vehicleNumber };
 
     setDoc(userProfileRef, profileData, { merge: true }).then(() => {
-        toast({
-            title: 'Profile Saved',
-            description: 'Your driver information has been updated.',
-        });
+        toast({ title: 'Profile Saved', description: 'Your driver information has been updated.' });
     }).catch(e => {
-        const permissionError = new FirestorePermissionError({
+        errorEmitter.emit('permission-error', new FirestorePermissionError({
             path: userProfileRef.path,
             operation: 'update',
             requestResourceData: profileData,
-          });
-        errorEmitter.emit('permission-error', permissionError);
-        toast({
-            variant: 'destructive',
-            title: 'Error Saving Profile',
-            description: 'There was a problem saving your information.',
-        });
+          }));
     }).finally(() => {
         setIsSaving(false);
     })
-  };
-
-  const testVoice = () => {
-    if ('speechSynthesis' in window) {
-      const utterance = new SpeechSynthesisUtterance('Voice alert activated.');
-      window.speechSynthesis.speak(utterance);
-    } else {
-      toast({
-        variant: 'destructive',
-        title: 'Unsupported Browser',
-        description: 'Your browser does not support voice synthesis.',
-      });
-    }
   };
 
   return (
@@ -135,7 +130,7 @@ export default function SettingsPage() {
         <Card>
           <CardHeader>
             <CardTitle>Driver Profile</CardTitle>
-            <CardDescription>This information will be used when you send alerts.</CardDescription>
+            <CardDescription>Broadcast identity settings.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
             <div className="space-y-2">
@@ -172,49 +167,22 @@ export default function SettingsPage() {
 
         <Card>
           <CardHeader>
-            <CardTitle>Appearance</CardTitle>
-            <CardDescription>Customize how the app looks on your device.</CardDescription>
+            <CardTitle>Safety Features</CardTitle>
+            <CardDescription>Manage intelligent safety monitoring.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="flex items-center justify-between rounded-lg border p-4">
               <div className="flex items-center space-x-3">
-                {isDarkMode ? <Moon className="text-primary" /> : <Sun className="text-accent" />}
+                <Activity className={collisionDetectionEnabled ? "text-primary" : "text-muted-foreground"} />
                 <div>
-                  <Label htmlFor="dark-mode" className="cursor-pointer">Dark Mode</Label>
-                  <p className="text-xs text-muted-foreground">Toggle between light and dark themes.</p>
+                  <Label htmlFor="collision-detection" className="cursor-pointer">Collision Detection</Label>
+                  <p className="text-xs text-muted-foreground">Automatically broadcast alerts if a high-impact event is detected.</p>
                 </div>
               </div>
               <Switch
-                id="dark-mode"
-                checked={isDarkMode}
-                onCheckedChange={handleDarkModeToggle}
-              />
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Notifications & Permissions</CardTitle>
-            <CardDescription>Manage how you receive alerts and share data.</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex items-center justify-between rounded-lg border p-4">
-              <div className="flex items-center space-x-3">
-                {voiceEnabled ? (
-                  <BellRing className="text-primary" />
-                ) : (
-                  <BellOff className="text-muted-foreground" />
-                )}
-                <div>
-                  <Label htmlFor="voice-alerts" className="cursor-pointer">Voice Alerts</Label>
-                  <p className="text-xs text-muted-foreground">Get audible notifications for new alerts.</p>
-                </div>
-              </div>
-              <Switch
-                id="voice-alerts"
-                checked={voiceEnabled}
-                onCheckedChange={handleVoiceToggle}
+                id="collision-detection"
+                checked={collisionDetectionEnabled}
+                onCheckedChange={handleCollisionToggle}
               />
             </div>
             <div className="flex items-center justify-between rounded-lg border p-4">
@@ -222,7 +190,7 @@ export default function SettingsPage() {
                  <MapPin className={locationEnabled ? "text-primary" : "text-muted-foreground"} />
                  <div>
                     <Label htmlFor="location-sharing" className="cursor-pointer">Location Sharing</Label>
-                    <p className="text-xs text-muted-foreground">Share location for more relevant alerts.</p>
+                    <p className="text-xs text-muted-foreground">Attach location to broadcasts.</p>
                  </div>
               </div>
               <Switch
@@ -231,9 +199,45 @@ export default function SettingsPage() {
                 onCheckedChange={handleLocationToggle}
               />
             </div>
-            <Button variant="outline" onClick={testVoice} disabled={!voiceEnabled}>
-              <Volume2 className="mr-2" />
-              Test Voice Alert
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Appearance & Sound</CardTitle>
+            <CardDescription>Customize your interface.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex items-center justify-between rounded-lg border p-4">
+              <div className="flex items-center space-x-3">
+                {isDarkMode ? <Moon className="text-primary" /> : <Sun className="text-accent" />}
+                <div>
+                  <Label htmlFor="dark-mode" className="cursor-pointer">Dark Mode</Label>
+                </div>
+              </div>
+              <Switch
+                id="dark-mode"
+                checked={isDarkMode}
+                onCheckedChange={handleDarkModeToggle}
+              />
+            </div>
+            <div className="flex items-center justify-between rounded-lg border p-4">
+              <div className="flex items-center space-x-3">
+                {voiceEnabled ? <BellRing className="text-primary" /> : <BellOff className="text-muted-foreground" />}
+                <div>
+                  <Label htmlFor="voice-alerts" className="cursor-pointer">Voice Alerts</Label>
+                </div>
+              </div>
+              <Switch
+                id="voice-alerts"
+                checked={voiceEnabled}
+                onCheckedChange={handleVoiceToggle}
+              />
+            </div>
+            <Button variant="outline" className="w-full" onClick={() => {
+              if ('speechSynthesis' in window) window.speechSynthesis.speak(new SpeechSynthesisUtterance('Voice alerts active.'));
+            }} disabled={!voiceEnabled}>
+              <Volume2 className="mr-2 h-4 w-4" /> Test Voice
             </Button>
           </CardContent>
         </Card>

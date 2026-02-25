@@ -1,35 +1,17 @@
+
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { collection, addDoc, serverTimestamp, doc } from 'firebase/firestore';
 import { useFirestore, errorEmitter, FirestorePermissionError, useUser, useDoc, useMemoFirebase } from '@/firebase';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Activity, ShieldAlert, TrafficCone, Car, Ambulance, Trash2, CircleOff, Waves, CloudRain, CloudFog, Wind, Snowflake, XCircle, Siren, Flame, TriangleAlert, Fuel, Hospital, Bike } from 'lucide-react';
 import type { UserProfile } from '@/lib/types';
 import { defaultLocation } from '@/lib/location';
-import { 
-  ShieldAlert, 
-  TrafficCone, 
-  Car, 
-  Ambulance,
-  Trash2,
-  CircleOff,
-  Waves,
-  CloudRain,
-  CloudFog,
-  Wind,
-  Snowflake,
-  XCircle,
-  Siren,
-  Flame,
-  TriangleAlert,
-  Fuel,
-  Hospital,
-  Bike
-} from 'lucide-react';
-
+import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
 
 const quickActions = [
   { name: 'Collision Ahead', icon: ShieldAlert },
@@ -58,6 +40,10 @@ export default function DetailedAlertPage() {
   const [submittingType, setSubmittingType] = useState<string | null>(null);
   const [voiceEnabled, setVoiceEnabled] = useState(false);
   const [locationEnabled, setLocationEnabled] = useState(false);
+  const [collisionDetectionEnabled, setCollisionDetectionEnabled] = useState(false);
+  const [isImpactDetected, setIsImpactDetected] = useState(false);
+  const [countdown, setCountdown] = useState<number | null>(null);
+  
   const firestore = useFirestore();
   const { toast } = useToast();
   const { user } = useUser();
@@ -69,68 +55,54 @@ export default function DetailedAlertPage() {
 
   const { data: userProfile } = useDoc<UserProfile>(userProfileRef);
 
-
   useEffect(() => {
-    const storedVoice = localStorage.getItem('voiceAlertsEnabled') === 'true';
-    setVoiceEnabled(storedVoice);
-    const storedLocation = localStorage.getItem('locationEnabled') === 'true';
-    setLocationEnabled(storedLocation);
+    if (typeof window !== 'undefined') {
+      setVoiceEnabled(localStorage.getItem('voiceAlertsEnabled') === 'true');
+      setLocationEnabled(localStorage.getItem('locationEnabled') === 'true');
+      setCollisionDetectionEnabled(localStorage.getItem('collisionDetectionEnabled') === 'true');
 
-    const handleStorageChange = () => {
-        const updatedVoice = localStorage.getItem('voiceAlertsEnabled') === 'true';
-        setVoiceEnabled(updatedVoice);
-        const updatedLocation = localStorage.getItem('locationEnabled') === 'true';
-        setLocationEnabled(updatedLocation);
-    }
-    window.addEventListener('storage', handleStorageChange);
-    return () => {
-      window.removeEventListener('storage', handleStorageChange);
+      const handleStorageChange = () => {
+        setVoiceEnabled(localStorage.getItem('voiceAlertsEnabled') === 'true');
+        setLocationEnabled(localStorage.getItem('locationEnabled') === 'true');
+        setCollisionDetectionEnabled(localStorage.getItem('collisionDetectionEnabled') === 'true');
+      };
+      window.addEventListener('storage', handleStorageChange);
+      return () => window.removeEventListener('storage', handleStorageChange);
     }
   }, []);
 
-  const sendAlert = (alertData: any) => {
+  const sendAlert = useCallback((alertData: any) => {
     if (!firestore) {
-      toast({
-        variant: 'destructive',
-        title: 'Error',
-        description: 'Firestore is not available.',
-      });
+      toast({ variant: 'destructive', title: 'Error', description: 'Firestore is not available.' });
       setSubmittingType(null);
       return;
     }
     const alertsRef = collection(firestore, 'alerts');
     addDoc(alertsRef, alertData)
       .then(() => {
-        toast({
-          title: 'Alert Sent!',
-          description: `"${alertData.message}" has been broadcasted.`,
-        });
+        toast({ title: 'Alert Sent!', description: `"${alertData.message}" has been broadcasted.` });
         if (voiceEnabled && 'speechSynthesis' in window) {
-            const utterance = new SpeechSynthesisUtterance(alertData.message);
-            window.speechSynthesis.speak(utterance);
+          window.speechSynthesis.speak(new SpeechSynthesisUtterance(alertData.message));
         }
       })
       .catch(() => {
-        const permissionError = new FirestorePermissionError({
+        errorEmitter.emit('permission-error', new FirestorePermissionError({
           path: alertsRef.path,
           operation: 'create',
           requestResourceData: alertData,
-        });
-        errorEmitter.emit('permission-error', permissionError);
+        }));
       })
       .finally(() => {
         setSubmittingType(null);
+        setIsImpactDetected(false);
+        setCountdown(null);
       });
-  }
+  }, [firestore, toast, voiceEnabled]);
 
-  const handleQuickAction = async (message: string) => {
+  const handleQuickAction = async (message: string, impactForce?: number) => {
     setSubmittingType(message);
     if (!firestore || !user) {
-      toast({
-        variant: 'destructive',
-        title: 'Error',
-        description: 'You must be logged in to send an alert.',
-      });
+      toast({ variant: 'destructive', title: 'Error', description: 'You must be logged in to send an alert.' });
       setSubmittingType(null);
       return;
     }
@@ -143,43 +115,116 @@ export default function DetailedAlertPage() {
       userId: user.uid,
     };
 
+    if (impactForce) alertData.impactForce = impactForce;
+
     if (locationEnabled) {
-        const { latitude, longitude } = defaultLocation;
-        alertData = { ...alertData, latitude, longitude };
+      const { latitude, longitude } = defaultLocation;
+      alertData = { ...alertData, latitude, longitude };
     }
 
     sendAlert(alertData);
   };
 
+  // Accelerometer logic
+  useEffect(() => {
+    if (!collisionDetectionEnabled) return;
+
+    const handleMotion = (event: DeviceMotionEvent) => {
+      const accel = event.accelerationIncludingGravity;
+      if (!accel) return;
+
+      const totalAccel = Math.sqrt(
+        (accel.x || 0) ** 2 + (accel.y || 0) ** 2 + (accel.z || 0) ** 2
+      );
+
+      // Threshold for collision detection (~2.5G)
+      if (totalAccel > 25 && !isImpactDetected) {
+        setIsImpactDetected(true);
+        setCountdown(5); // 5 second countdown to cancel
+      }
+    };
+
+    window.addEventListener('devicemotion', handleMotion);
+    return () => window.removeEventListener('devicemotion', handleMotion);
+  }, [collisionDetectionEnabled, isImpactDetected]);
+
+  useEffect(() => {
+    let timer: NodeJS.Timeout;
+    if (countdown !== null && countdown > 0) {
+      timer = setTimeout(() => setCountdown(countdown - 1), 1000);
+    } else if (countdown === 0) {
+      handleQuickAction('Automatic Collision Detected!', 25);
+    }
+    return () => clearTimeout(timer);
+  }, [countdown]);
+
+  const cancelAutoAlert = () => {
+    setIsImpactDetected(false);
+    setCountdown(null);
+    toast({ title: 'Alert Cancelled', description: 'Automatic broadcast stopped.' });
+  };
+
   return (
-      <div className="w-full max-w-4xl mx-auto">
-          <Card>
-              <CardHeader>
-                  <CardTitle>Quick Alert</CardTitle>
-                  <CardDescription>
-                      Send an instant alert with one tap. If enabled, your location will be attached.
-                  </CardDescription>
-              </CardHeader>
-              <CardContent className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
-                {quickActions.map((action) => (
-                  <Button
-                    key={action.name}
-                    variant="outline"
-                    size="lg"
-                    onClick={() => handleQuickAction(action.name)}
-                    disabled={!!submittingType}
-                    className="flex-col h-auto py-6 text-center text-base transition-all duration-200 ease-in-out transform hover:scale-105 hover:shadow-lg focus:ring-2 focus:ring-accent"
-                  >
-                    {submittingType === action.name ? (
-                      <Loader2 className="animate-spin h-6 w-6 mb-2" />
-                    ) : (
-                      <action.icon className="h-6 w-6 mb-2 text-accent" />
-                    )}
-                    <span>{action.name}</span>
-                  </Button>
-                ))}
-              </CardContent>
-          </Card>
-        </div>
+    <div className="w-full max-w-4xl mx-auto space-y-6">
+      {isImpactDetected && (
+        <Card className="bg-destructive text-destructive-foreground animate-pulse border-4 border-white">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Activity className="animate-bounce" /> HIGH IMPACT DETECTED!
+            </CardTitle>
+            <CardDescription className="text-destructive-foreground/90">
+              Broadcasting collision alert in {countdown} seconds...
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Button variant="secondary" className="w-full" onClick={cancelAutoAlert}>
+              CANCEL AUTO-BROADCAST
+            </Button>
+          </CardContent>
+        </Card>
+      )}
+
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between">
+          <div>
+            <CardTitle>Quick Alert</CardTitle>
+            <CardDescription>Send an instant safety broadcast.</CardDescription>
+          </div>
+          <div className="flex items-center gap-2">
+            <Activity className={collisionDetectionEnabled ? "text-accent" : "text-muted-foreground"} />
+            <div className="flex flex-col items-end">
+              <Label htmlFor="collision-switch" className="text-xs font-bold">Collision Detection</Label>
+              <Switch 
+                id="collision-switch"
+                checked={collisionDetectionEnabled} 
+                onCheckedChange={(val) => {
+                  setCollisionDetectionEnabled(val);
+                  localStorage.setItem('collisionDetectionEnabled', String(val));
+                }}
+              />
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+          {quickActions.map((action) => (
+            <Button
+              key={action.name}
+              variant="outline"
+              size="lg"
+              onClick={() => handleQuickAction(action.name)}
+              disabled={!!submittingType || isImpactDetected}
+              className="flex-col h-auto py-6 text-center text-base transition-all hover:scale-105 hover:shadow-lg focus:ring-2 focus:ring-accent"
+            >
+              {submittingType === action.name ? (
+                <Loader2 className="animate-spin h-6 w-6 mb-2" />
+              ) : (
+                <action.icon className="h-6 w-6 mb-2 text-accent" />
+              )}
+              <span>{action.name}</span>
+            </Button>
+          ))}
+        </CardContent>
+      </Card>
+    </div>
   );
 }

@@ -1,3 +1,4 @@
+
 {
   "entities": {
     "Alert": {
@@ -30,6 +31,10 @@
         "longitude": {
             "type": "number",
             "description": "The longitude where the alert was created."
+        },
+        "impactForce": {
+          "type": "number",
+          "description": "The G-force or acceleration value measured during a collision event (in m/s^2)."
         }
       },
       "required": [

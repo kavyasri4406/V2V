@@ -1,3 +1,4 @@
+
 import { FieldValue, Timestamp } from 'firebase/firestore';
 
 export type Alert = {
@@ -9,6 +10,7 @@ export type Alert = {
   userId?: string;
   latitude?: number;
   longitude?: number;
+  impactForce?: number;
 };
 
 export type UserProfile = {
