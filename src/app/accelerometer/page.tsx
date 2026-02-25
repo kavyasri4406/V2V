@@ -33,7 +33,6 @@ export default function AccelerometerPage() {
   const { toast } = useToast();
   const { database } = useFirebase();
   const dataRef = useRef<AccelPoint[]>([]);
-  const lastTimeRef = useRef<number>(Date.now());
 
   const chartConfig = {
     x: { label: "X-Axis", color: "hsl(var(--primary))" },
@@ -53,38 +52,43 @@ export default function AccelerometerPage() {
       if (!val) return;
 
       // Extract raw values
-      const x = Number(val.x) || 0;
-      const y = Number(val.y) || 0;
-      const z = Number(val.z) || 0;
+      const x_raw = Number(val.x) || 0;
+      const y_raw = Number(val.y) || 0;
+      const z_raw = Number(val.z) || 0;
       
-      // Calculate magnitude
-      const total = Math.sqrt(x * x + y * y + z * z);
-      const now = Date.now();
-      const dt = (now - lastTimeRef.current) / 1000; // seconds
-      lastTimeRef.current = now;
+      // 1. Convert raw to g: acc_g = raw / 16384
+      const ax_g = x_raw / 16384;
+      const ay_g = y_raw / 16384;
+      const az_g = z_raw / 16384;
 
-      // Calculate speed estimate (simple integration)
-      // Assuming units are m/s^2. We subtract gravity (approx 9.81) for magnitude
-      const gravity = 9.81;
-      const netAccel = Math.abs(total - gravity);
-      
+      // 2. Convert g to m/s²: acc_ms2 = acc_g * 9.81
+      const ax_ms2 = ax_g * 9.81;
+      const ay_ms2 = ay_g * 9.81;
+      const az_ms2 = az_g * 9.81;
+
+      // 3. Compute resultant acceleration: a = sqrt(ax^2 + ay^2 + az^2)
+      const a = Math.sqrt(ax_ms2 * ax_ms2 + ay_ms2 * ay_ms2 + az_ms2 * az_ms2);
+
+      // 4. Since deltaTime = 1 second (from your hardware interval): speed_ms = a * 1
+      const speed_ms = a * 1;
+
+      // 5. Convert to km/h: speed_kmh = speed_ms * 3.6
+      const current_speed_kmh = speed_ms * 3.6;
+
+      // 6. Add smoothing to avoid spikes: speed_kmh = 0.8 * previous_speed + 0.2 * current_speed
+      // 7. Clamp speed so it never goes below 0.
       setSpeed(prev => {
-        // If acceleration is very low, we assume stationary to handle noise drift
-        if (netAccel < 0.2) return prev * 0.98; // slow decay
-        
-        const deltaV = netAccel * dt * 3.6; // convert m/s to km/h
-        const newSpeed = prev + deltaV;
-        return Math.max(0, newSpeed);
+        const smoothed = (0.8 * prev) + (0.2 * current_speed_kmh);
+        return Math.max(0, smoothed);
       });
 
       const time = new Date().toLocaleTimeString([], { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
 
-      const newPoint = { time, x, y, z, total };
+      const newPoint = { time, x: ax_ms2, y: ay_ms2, z: az_ms2, total: a };
       setCurrent(newPoint);
       
-      // Track peak encounter
-      const highestAxis = Math.max(Math.abs(x), Math.abs(y), Math.abs(z));
-      setMaxForceValue(prev => Math.max(prev, highestAxis));
+      // Track peak resultant force
+      setMaxForceValue(prev => Math.max(prev, a));
 
       // Update history for chart (limit to 30 points)
       dataRef.current = [...dataRef.current, newPoint].slice(-30);
@@ -100,7 +104,6 @@ export default function AccelerometerPage() {
 
   const handleStart = () => {
     setActive(true);
-    lastTimeRef.current = Date.now();
     toast({ title: 'Telemetry Active', description: 'Monitoring bike speed and dynamics.' });
   };
 
@@ -126,7 +129,7 @@ export default function AccelerometerPage() {
            </div>
            <div className="relative">
              <span className="text-8xl md:text-9xl font-black tabular-nums tracking-tighter italic">
-               {speed.toFixed(0)}
+               {speed.toFixed(1)}
              </span>
              <span className="text-2xl md:text-3xl font-bold ml-2 italic opacity-80 uppercase tracking-widest text-primary/80">
                km/h
