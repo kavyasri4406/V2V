@@ -33,6 +33,9 @@ export default function AccelerometerPage() {
   const { toast } = useToast();
   const { database } = useFirebase();
   const dataRef = useRef<AccelPoint[]>([]);
+  
+  // Ref to track the accumulated speed in m/s for integration
+  const speedMSRef = useRef(0);
 
   const chartConfig = {
     x: { label: "X-Axis", color: "hsl(var(--primary))" },
@@ -51,44 +54,49 @@ export default function AccelerometerPage() {
       const val = snapshot.val();
       if (!val) return;
 
-      // Extract raw values
+      // 1. Convert raw MPU6050 values to m/s²
+      // raw / 16384 = g
+      // g * 9.81 = m/s²
       const x_raw = Number(val.x) || 0;
       const y_raw = Number(val.y) || 0;
       const z_raw = Number(val.z) || 0;
       
-      // 1. Convert raw to g: acc_g = raw / 16384
-      const ax_g = x_raw / 16384;
-      const ay_g = y_raw / 16384;
-      const az_g = z_raw / 16384;
+      const ax_ms2 = (x_raw / 16384) * 9.81;
+      const ay_ms2 = (y_raw / 16384) * 9.81;
+      const az_ms2 = (z_raw / 16384) * 9.81;
 
-      // 2. Convert g to m/s²: acc_ms2 = acc_g * 9.81
-      const ax_ms2 = ax_g * 9.81;
-      const ay_ms2 = ay_g * 9.81;
-      const az_ms2 = az_g * 9.81;
+      // 2. Remove gravity from the vertical axis
+      const az_corrected = az_ms2 - 9.81;
 
-      // 3. Compute resultant acceleration: a = sqrt(ax^2 + ay^2 + az^2)
-      const a = Math.sqrt(ax_ms2 * ax_ms2 + ay_ms2 * ay_ms2 + az_ms2 * az_ms2);
+      // 3. Compute horizontal acceleration only
+      const horizontal_a = Math.sqrt(ax_ms2 * ax_ms2 + ay_ms2 * ay_ms2);
 
-      // 4. Since deltaTime = 1 second (from your hardware interval): speed_ms = a * 1
-      const speed_ms = a * 1;
+      // 4. Combine horizontal acceleration with corrected vertical acceleration (for logging/peak)
+      const total_a = Math.sqrt(horizontal_a * horizontal_a + az_corrected * az_corrected);
 
-      // 5. Convert to km/h: speed_kmh = speed_ms * 3.6
-      const current_speed_kmh = speed_ms * 3.6;
+      // 5. Use horizontal acceleration for speed calculation
+      const acceleration_used_for_speed = horizontal_a;
 
-      // 6. Add smoothing to avoid spikes: speed_kmh = 0.8 * previous_speed + 0.2 * current_speed
-      // 7. Clamp speed so it never goes below 0.
+      // 6. With deltaTime = 1 second: speed_ms = speed_ms + acceleration_used_for_speed * 1
+      speedMSRef.current = speedMSRef.current + (acceleration_used_for_speed * 1);
+
+      // 7. Convert to km/h
+      const new_speed_kmh = speedMSRef.current * 3.6;
+
+      // 8. Add smoothing: speed_kmh = 0.8 * previous_speed + 0.2 * current_speed
+      // 9. Clamp: speed_kmh = max(0, speed_kmh)
       setSpeed(prev => {
-        const smoothed = (0.8 * prev) + (0.2 * current_speed_kmh);
+        const smoothed = (0.8 * prev) + (0.2 * new_speed_kmh);
         return Math.max(0, smoothed);
       });
 
       const time = new Date().toLocaleTimeString([], { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
 
-      const newPoint = { time, x: ax_ms2, y: ay_ms2, z: az_ms2, total: a };
+      const newPoint = { time, x: ax_ms2, y: ay_ms2, z: az_ms2, total: total_a };
       setCurrent(newPoint);
       
-      // Track peak resultant force
-      setMaxForceValue(prev => Math.max(prev, a));
+      // Track peak resultant force (corrected)
+      setMaxForceValue(prev => Math.max(prev, total_a));
 
       // Update history for chart (limit to 30 points)
       dataRef.current = [...dataRef.current, newPoint].slice(-30);
@@ -113,6 +121,7 @@ export default function AccelerometerPage() {
   };
 
   const resetSpeed = () => {
+    speedMSRef.current = 0;
     setSpeed(0);
     toast({ title: 'Speed Reset', description: 'Odometer zeroed.' });
   };
@@ -125,7 +134,7 @@ export default function AccelerometerPage() {
         <CardContent className="p-8 flex flex-col items-center justify-center text-center">
            <div className="flex items-center gap-2 mb-2 text-[10px] font-black uppercase tracking-[0.2em] text-primary/60">
              <Gauge className="h-3 w-3" />
-             Live Velocity
+             Live Velocity (Grav-Compensated)
            </div>
            <div className="relative">
              <span className="text-8xl md:text-9xl font-black tabular-nums tracking-tighter italic">
