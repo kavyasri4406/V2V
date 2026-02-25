@@ -5,19 +5,27 @@
       "$schema": "http://json-schema.org/draft-07/schema#",
       "title": "Alert",
       "type": "object",
-      "description": "Represents a vehicle alert submitted by a user.",
+      "description": "Represents a vehicle alert or automated collision report.",
       "properties": {
         "id": {
           "type": "string",
-          "description": "Unique identifier for the alert entity."
+          "description": "Unique identifier for the alert."
+        },
+        "driver_name": {
+          "type": "string",
+          "description": "Name of the driver sending the alert."
+        },
+        "sender_vehicle": {
+          "type": "string",
+          "description": "License plate or vehicle ID."
         },
         "message": {
           "type": "string",
-          "description": "The alert message submitted by the user."
+          "description": "The alert message or automated status."
         },
         "timestamp": {
           "type": "string",
-          "description": "The timestamp of when the alert was created.",
+          "description": "The timestamp of the event.",
           "format": "date-time"
         },
         "userId": {
@@ -25,20 +33,19 @@
           "description": "The ID of the user who created the alert."
         },
         "latitude": {
-            "type": "number",
-            "description": "The latitude where the alert was created."
+          "type": "number",
+          "description": "The latitude of the event."
         },
         "longitude": {
-            "type": "number",
-            "description": "The longitude where the alert was created."
+          "type": "number",
+          "description": "The longitude of the event."
         },
         "impactForce": {
           "type": "number",
-          "description": "The G-force or acceleration value measured during a collision event (in m/s^2)."
+          "description": "The measured G-force during an impact event."
         }
       },
       "required": [
-        "id",
         "message",
         "timestamp",
         "userId"
@@ -58,36 +65,9 @@
           "description": "The vehicle's identification number."
         }
       },
-      "required": ["driverName", "vehicleNumber"]
-    },
-    "SentAlert": {
-      "title": "Sent Alert",
-      "type": "object",
-      "description": "Represents a detailed alert sent from the 'Send Alert' form.",
-      "properties": {
-        "driver_name": {
-          "type": "string",
-          "description": "Name of the driver sending the alert."
-        },
-        "vehicle_number": {
-          "type": "string",
-          "description": "License plate or identification number of the vehicle."
-        },
-        "message": {
-          "type": "string",
-          "description": "The content of the alert message."
-        },
-        "timestamp": {
-          "type": "string",
-          "format": "date-time",
-          "description": "The server-side timestamp of when the alert was sent."
-        }
-      },
       "required": [
-        "driver_name",
-        "vehicle_number",
-        "message",
-        "timestamp"
+        "driverName",
+        "vehicleNumber"
       ]
     },
     "Note": {
@@ -117,7 +97,12 @@
           "description": "The ID of the user who owns the note."
         }
       },
-      "required": ["title", "createdAt", "completed", "userId"]
+      "required": [
+        "title",
+        "createdAt",
+        "completed",
+        "userId"
+      ]
     }
   },
   "auth": {
@@ -134,7 +119,7 @@
           "schema": {
             "$ref": "#/backend/entities/Alert"
           },
-          "description": "Collection of vehicle alerts. `alertId` is the unique identifier for each alert.",
+          "description": "Collection of vehicle alerts and collision detections.",
           "params": [
             {
               "name": "alertId",
@@ -150,11 +135,11 @@
           "schema": {
             "$ref": "#/backend/entities/UserProfile"
           },
-          "description": "Stores user profile information, where `userId` is the Firebase Auth UID.",
-           "params": [
+          "description": "Stores user profile information.",
+          "params": [
             {
               "name": "userId",
-              "description": "The user's unique ID from Firebase Authentication."
+              "description": "The user's unique ID."
             }
           ]
         }
@@ -170,7 +155,7 @@
           "params": [
             {
               "name": "userId",
-              "description": "The user's unique ID from Firebase Authentication."
+              "description": "The user's unique ID."
             },
             {
               "name": "noteId",
