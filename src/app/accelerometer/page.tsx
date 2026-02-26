@@ -59,21 +59,31 @@ export default function AccelerometerPage() {
       const dt = lastUpdateRef.current ? (now - lastUpdateRef.current) / 1000 : 1;
       lastUpdateRef.current = now;
 
+      // 1. Convert raw to m/s2
       const ax_ms2 = (Number(val.x) / 16384) * 9.81;
       const ay_ms2 = (Number(val.y) / 16384) * 9.81;
       const az_ms2 = (Number(val.z) / 16384) * 9.81;
 
+      // 2. Remove gravity from Z
       const az_corrected = az_ms2 - 9.81;
+      
+      // 3. Horizontal acceleration only
       const horizontal_a = Math.sqrt(ax_ms2 * ax_ms2 + ay_ms2 * ay_ms2);
 
+      // Noise gate: ignore values below 0.15 m/s2 to prevent drift
       const NOISE_THRESHOLD = 0.15;
       const filtered_a = horizontal_a > NOISE_THRESHOLD ? horizontal_a : 0;
 
+      // Resultant total for G-force monitoring
       const total_a = Math.sqrt(horizontal_a * horizontal_a + az_corrected * az_corrected);
 
+      // 4. Integrate speed (m/s)
       speedMSRef.current = speedMSRef.current + (filtered_a * dt);
+      
+      // 5. Convert to km/h
       const current_kmh = speedMSRef.current * 3.6;
 
+      // 6. Smoothing (EMA)
       setSpeed(prev => {
         const smoothed = (0.75 * prev) + (0.25 * current_kmh);
         const clamped = Math.max(0, smoothed);
@@ -156,6 +166,7 @@ export default function AccelerometerPage() {
               />
             </svg>
 
+            {/* Ticks */}
             <div className="absolute inset-0 opacity-20 pointer-events-none">
                {[...Array(24)].map((_, i) => (
                  <div 
