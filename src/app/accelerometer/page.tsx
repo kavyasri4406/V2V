@@ -25,6 +25,7 @@ type AccelPoint = {
 
 export default function AccelerometerPage() {
   const [active, setActive] = useState(false);
+  const [isMounted, setIsMounted] = useState(false);
   const [data, setData] = useState<AccelPoint[]>([]);
   const [current, setCurrent] = useState<AccelPoint>({ time: '', x: 0, y: 0, z: 0, total: 0 });
   const [maxForceValue, setMaxForceValue] = useState(0);
@@ -35,9 +36,8 @@ export default function AccelerometerPage() {
   const { database } = useFirebase();
   const dataRef = useRef<AccelPoint[]>([]);
   
-  // Ref to track the accumulated speed in m/s and timestamp for integration
+  // Accumulated speed in m/s
   const speedMSRef = useRef(0);
-  const lastUpdateRef = useRef<number | null>(null);
 
   const chartConfig = {
     x: { label: "Longitudinal", color: "hsl(var(--primary))" },
@@ -45,6 +45,10 @@ export default function AccelerometerPage() {
     z: { label: "Vertical", color: "hsl(var(--chart-1))" },
     total: { label: "Resultant", color: "hsl(var(--foreground))" },
   };
+
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
 
   useEffect(() => {
     if (!active || !database) return;
@@ -55,31 +59,26 @@ export default function AccelerometerPage() {
       const val = snapshot.val();
       if (!val) return;
 
-      const now = Date.now();
-      // Calculate delta time in seconds (fallback to 1s if first reading)
-      const dt = lastUpdateRef.current ? (now - lastUpdateRef.current) / 1000 : 1;
-      lastUpdateRef.current = now;
-
       // 1. Convert raw to m/s2 (raw / 16384 * 9.81)
       const ax_ms2 = (Number(val.x) / 16384) * 9.81;
       const ay_ms2 = (Number(val.y) / 16384) * 9.81;
       const az_ms2 = (Number(val.z) / 16384) * 9.81;
 
-      // 2. Remove gravity from Z (compensation)
+      // 2. Gravity compensation (Z-axis)
       const az_corrected = az_ms2 - 9.81;
       
-      // 3. Compute horizontal acceleration for speed integration
+      // 3. Compute horizontal acceleration
       const horizontal_a = Math.sqrt(ax_ms2 * ax_ms2 + ay_ms2 * ay_ms2);
 
       // Noise gate: ignore values below 0.15 m/s2 to prevent static drift
       const NOISE_THRESHOLD = 0.15;
       const filtered_a = horizontal_a > NOISE_THRESHOLD ? horizontal_a : 0;
 
-      // Resultant total for G-force/Impact monitoring
+      // Resultant total for G-force monitoring
       const total_a = Math.sqrt(horizontal_a * horizontal_a + az_corrected * az_corrected);
 
-      // 4. Integrate speed (m/s) using horizontal acceleration
-      speedMSRef.current = speedMSRef.current + (filtered_a * dt);
+      // 4. Integrate speed (m/s) - delta time is fixed 1s as per sensor frequency
+      speedMSRef.current = speedMSRef.current + (filtered_a * 1);
       
       // 5. Convert to km/h
       const current_kmh = speedMSRef.current * 3.6;
@@ -106,7 +105,6 @@ export default function AccelerometerPage() {
 
     return () => {
       off(sensorRef);
-      lastUpdateRef.current = null;
     };
   }, [active, database, maxSpeedValue]);
 
@@ -118,8 +116,17 @@ export default function AccelerometerPage() {
     toast({ title: 'Telemetry Reset', description: 'Session data and odometer zeroed.' });
   };
 
+  // SVG Gauge calculations
+  const radius = 90;
+  const circumference = 2 * Math.PI * radius;
+  const maxSpeedRange = 140; // Max visual range of the gauge
+  const percentage = Math.min(speed / maxSpeedRange, 1);
+  const strokeDashoffset = circumference - (percentage * circumference * 0.75); // 270 degree arc
+
+  if (!isMounted) return null;
+
   return (
-    <div className="w-full max-w-6xl mx-auto space-y-6 pb-12">
+    <div className="w-full max-w-6xl mx-auto space-y-6 pb-12 animate-in fade-in duration-500">
       {/* Header Section */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
         <div>
@@ -150,46 +157,117 @@ export default function AccelerometerPage() {
         </div>
       </div>
 
-      {/* Main Speedometer Display */}
-      <Card className="bg-card border-border/40 overflow-hidden shadow-2xl relative">
-        <div className="absolute top-0 right-0 p-4">
-           <div className="flex items-center gap-2">
-              <div className={cn("w-2 h-2 rounded-full", active ? "bg-primary animate-pulse" : "bg-zinc-700")} />
+      {/* Main Speedometer Housing - Circular Frame */}
+      <div className="flex justify-center py-8">
+        <Card className="w-[340px] h-[340px] md:w-[400px] md:h-[400px] rounded-full bg-card border-[8px] border-muted/50 overflow-hidden shadow-[0_0_50px_rgba(0,0,0,0.2)] relative flex flex-col items-center justify-center group transition-all duration-700">
+          {/* Neon Glow Effect */}
+          <div className={cn(
+            "absolute inset-0 bg-gradient-to-br from-primary/5 to-accent/5 opacity-0 transition-opacity duration-500",
+            active && "opacity-100"
+          )} />
+          
+          <div className="absolute top-12 flex flex-col items-center gap-1 z-20">
+            <div className="flex items-center gap-2">
+              <div className={cn("w-2 h-2 rounded-full", active ? "bg-primary animate-pulse shadow-[0_0_8px_rgba(var(--primary),0.8)]" : "bg-zinc-700")} />
               <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
                 {active ? "Link Active" : "Standby"}
               </span>
             </div>
-        </div>
-        <CardContent className="pt-12 pb-16 flex flex-col items-center justify-center text-center">
-          <div className="space-y-2 mb-4">
-             <span className="text-xs font-black uppercase tracking-[0.4em] text-muted-foreground/40">Vehicle Velocity</span>
-             <div className="flex items-baseline justify-center gap-4">
-                <span className="text-9xl font-black tracking-tighter tabular-nums leading-none">
+          </div>
+
+          {/* SVG Gauge */}
+          <div className="relative z-10">
+            <svg width="240" height="240" viewBox="0 0 200 200" className="transform -rotate-225">
+              {/* Background Arc */}
+              <circle
+                cx="100"
+                cy="100"
+                r={radius}
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="12"
+                strokeDasharray={`${circumference * 0.75} ${circumference}`}
+                className="text-muted/20"
+                strokeLinecap="round"
+              />
+              {/* Progress Arc */}
+              <circle
+                cx="100"
+                cy="100"
+                r={radius}
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="12"
+                strokeDasharray={`${circumference * 0.75} ${circumference}`}
+                strokeDashoffset={strokeDashoffset}
+                className={cn(
+                  "text-primary transition-all duration-700 ease-out",
+                  speed > 100 ? "text-destructive" : "text-primary"
+                )}
+                strokeLinecap="round"
+                style={{ filter: 'drop-shadow(0 0 8px currentColor)' }}
+              />
+              
+              {/* Ticks */}
+              {[...Array(9)].map((_, i) => (
+                <line
+                  key={i}
+                  x1="100"
+                  y1="20"
+                  x2="100"
+                  y2="30"
+                  transform={`rotate(${i * 33.75 + 45} 100 100)`}
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  className="text-muted-foreground/30"
+                />
+              ))}
+            </svg>
+
+            {/* Central Speed Readout */}
+            <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
+              <div className="space-y-0 -mt-4">
+                <span className="text-6xl md:text-7xl font-black tracking-tighter tabular-nums leading-none block">
                   {speed.toFixed(1)}
                 </span>
-                <span className="text-3xl font-black text-primary italic uppercase tracking-tighter">km/h</span>
-             </div>
+                <span className="text-lg font-black text-primary italic uppercase tracking-tighter">km/h</span>
+              </div>
+            </div>
+
+            {/* Needle */}
+            <div 
+              className="absolute top-1/2 left-1/2 w-1 h-32 -mt-32 -ml-0.5 origin-bottom transition-transform duration-700 ease-out z-30"
+              style={{ 
+                transform: `translateX(-50%) rotate(${percentage * 270 - 135}deg)` 
+              }}
+            >
+              <div className="w-full h-full bg-gradient-to-t from-transparent via-accent to-accent rounded-full shadow-[0_0_10px_rgba(255,100,100,0.5)]" />
+            </div>
+            <div className="absolute top-1/2 left-1/2 -ml-3 -mt-3 w-6 h-6 bg-card border-4 border-muted rounded-full z-40 shadow-xl" />
           </div>
-          
-          <div className="grid grid-cols-2 gap-12 w-full max-w-sm mt-8 border-t border-border/10 pt-8">
-            <div className="flex flex-col items-center">
-              <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Session Peak</span>
-              <span className="text-2xl font-black italic">{maxSpeedValue.toFixed(1)} <small className="text-[10px] uppercase">km/h</small></span>
-            </div>
-            <div className="flex flex-col items-center">
-              <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Peak Impact</span>
-              <span className="text-2xl font-black italic text-accent">{(maxForceValue / 9.81).toFixed(2)} <small className="text-[10px] uppercase">G</small></span>
-            </div>
+
+          <div className="absolute bottom-12 flex flex-col items-center gap-1 z-20">
+             <div className="flex gap-4">
+               <div className="text-center">
+                 <p className="text-[9px] font-black text-muted-foreground uppercase tracking-widest">Peak</p>
+                 <p className="text-sm font-black italic">{maxSpeedValue.toFixed(1)}</p>
+               </div>
+               <div className="w-px h-6 bg-muted/20" />
+               <div className="text-center">
+                 <p className="text-[9px] font-black text-muted-foreground uppercase tracking-widest">Impact</p>
+                 <p className="text-sm font-black italic text-accent">{(maxForceValue / 9.81).toFixed(2)}G</p>
+               </div>
+             </div>
           </div>
 
           {speed > 100 && (
              <div className="absolute bottom-6 flex items-center gap-2 px-4 py-1 bg-destructive/10 text-destructive rounded-full animate-bounce">
-                <TriangleAlert className="h-4 w-4" />
-                <span className="text-[10px] font-black uppercase tracking-widest">Velocity Warning</span>
+                <TriangleAlert className="h-3 w-3" />
+                <span className="text-[9px] font-black uppercase tracking-widest">Velocity Warn</span>
              </div>
           )}
-        </CardContent>
-      </Card>
+        </Card>
+      </div>
 
       {/* Secondary Telemetry Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -273,7 +351,7 @@ export default function AccelerometerPage() {
       <div className="flex items-center gap-2 p-4 bg-muted/20 border border-border/50 rounded-lg">
           <Info className="h-4 w-4 text-primary shrink-0" />
           <p className="text-[10px] font-bold text-muted-foreground uppercase leading-relaxed tracking-wide">
-            Calculation Note: Speed is estimated by integrating horizontal G-forces over the packet arrival interval (dt). Gravity compensation is applied to the Z-axis. Noise gate filter active at 0.15 m/s².
+            Calculation Note: Speed is estimated by integrating horizontal G-forces (Ax, Ay) over the 1s sensor interval. Earth's gravity (~9.81 m/s²) is compensated on the Z-axis. Smoothing is applied via a 0.8 EMA filter.
           </p>
       </div>
     </div>

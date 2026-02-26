@@ -1,4 +1,3 @@
-
 'use client';
 
 import { Toaster } from '@/components/ui/toaster';
@@ -34,13 +33,14 @@ export function AppProviders({
       document.documentElement.classList.remove('dark');
     }
     
+    // Controlled delay to ensure safe hydration before fading splash
     const fadeTimer = setTimeout(() => {
       setIsFadingOut(true);
-    }, 100);
+    }, 400);
 
     const loadTimer = setTimeout(() => {
       setIsLoading(false);
-    }, 250);
+    }, 600);
 
     return () => {
       clearTimeout(fadeTimer);
@@ -48,17 +48,24 @@ export function AppProviders({
     };
   }, []);
 
-  // Hydration fix: These initial strings MUST match the server-side render exactly
-  const initialSplashClasses = "fixed inset-0 z-[100] transition-opacity duration-150 opacity-100";
-  const initialContentClasses = "transition-all duration-150 opacity-0 scale-99 blur-sm";
+  // Hydration safety: Return a placeholder that exactly matches server SSR until mounted
+  if (!mounted) {
+    return (
+      <div className="fixed inset-0 z-[100] bg-black">
+        <SplashScreen />
+      </div>
+    );
+  }
 
-  const splashContainerClasses = mounted 
-    ? cn("fixed inset-0 z-[100] transition-opacity duration-150", isFadingOut ? "opacity-0 pointer-events-none" : "opacity-100")
-    : initialSplashClasses;
+  const splashContainerClasses = cn(
+    "fixed inset-0 z-[100] transition-opacity duration-500 ease-in-out bg-black",
+    isFadingOut ? "opacity-0 pointer-events-none" : "opacity-100"
+  );
 
-  const contentContainerClasses = mounted
-    ? cn("transition-all duration-150", isLoading ? 'opacity-0 scale-99 blur-sm' : 'opacity-100 scale-100 blur-0')
-    : initialContentClasses;
+  const contentContainerClasses = cn(
+    "transition-all duration-500",
+    isLoading ? 'opacity-0 scale-[0.98] blur-md' : 'opacity-100 scale-100 blur-0'
+  );
 
   return (
     <>
@@ -73,7 +80,7 @@ export function AppProviders({
               <AuthLayout>{children}</AuthLayout>
               ) : (
               <MainLayout>
-                  <div className="animate-in fade-in slide-in-from-bottom-1 duration-150 ease-out fill-mode-forwards">
+                  <div className="animate-in fade-in slide-in-from-bottom-1 duration-300 ease-out fill-mode-forwards">
                     {children}
                   </div>
               </MainLayout>
