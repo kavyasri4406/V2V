@@ -68,35 +68,35 @@ export default function AccelerometerPage() {
       const az = (Number(val.z) / 16384) * 9.81;
 
       // ---------------------------------------------------------
-      // BIKE-SMOOTH SPEED LOGIC (TEMPORARY SLOW MODE)
+      // BIKE-SMOOTH SPEED LOGIC (PRODUCTION MODE)
       // ---------------------------------------------------------
       
       // 1. Compute horizontal magnitude
       const horizontal_a = Math.sqrt(ax * ax + ay * ay);
 
-      // 2. HARD noise filter (stops noise-based drift)
+      // 2. HARD noise filter (stops all noise from increasing speed)
       const filter_a = horizontal_a > 0.65 ? horizontal_a : 0;
 
-      // 3. Integration with TEMPORARY VERY SLOW gain (0.01 instead of 1.0)
+      // 3. Integration with 1.0 gain for realistic velocity accumulation
       if (filter_a > 0) {
-        speedMSRef.current = speedMSRef.current + (filter_a * 0.01);
+        speedMSRef.current = speedMSRef.current + (filter_a * 1.0);
       } else {
         // gradual fall like a bike
         speedMSRef.current = speedMSRef.current * 0.88;
       }
 
       // 4. Convert to km/h
-      let speed_kmh = speedMSRef.current * 3.6;
+      let speed_kmh_raw = speedMSRef.current * 3.6;
 
-      // 5. Apply smoothing (0.7 EMA)
+      // 5. Apply smoothing (0.7 EMA) and clamping
       setSpeed(prev => {
-        let smoothed = (0.70 * prev) + (0.30 * speed_kmh);
+        let smoothed = (0.70 * prev) + (0.30 * speed_kmh_raw);
         
-        // 6. Clamp unrealistic spikes and set TEMPORARY MAX of 2.0
+        // 6. Clamp unrealistic spikes and force zero for stillness
         if (smoothed > prev + 8) smoothed = prev + 8;
         if (smoothed < 0.5) smoothed = 0;
         
-        const finalSpeed = Math.min(smoothed, 2.0); // HARD LIMIT AT 2.0
+        const finalSpeed = Math.max(0, smoothed);
         
         if (finalSpeed > maxSpeedValue) setMaxSpeedValue(finalSpeed);
         return finalSpeed;
@@ -305,13 +305,6 @@ export default function AccelerometerPage() {
             </CardContent>
           </Card>
         ))}
-      </div>
-
-      <div className="flex items-center gap-2 p-4 bg-muted/20 border border-border/50 rounded-lg">
-          <Info className="h-4 w-4 text-primary shrink-0" />
-          <p className="text-[10px] font-bold text-muted-foreground uppercase leading-relaxed tracking-wide">
-            Mode: Safe Testing. Speed logic uses a 0.65 threshold and 0.01 gain (Capped at 2.0 km/h) to prevent noise spikes during initial hardware sync.
-          </p>
       </div>
     </div>
   );
