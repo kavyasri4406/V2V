@@ -49,13 +49,12 @@ export default function AccelerometerPage() {
       if (!val) return;
 
       // 1. Convert raw values (MPU6050 LSB/g) to m/s2
-      // Using 16384 LSB/g for default +/- 2g range
       const ax = (Number(val.x) / 16384) * 9.81;
       const ay = (Number(val.y) / 16384) * 9.81;
       const az = (Number(val.z) / 16384) * 9.81;
 
       // ---------------------------------------------------------
-      // BIKE-SMOOTH SPEED LOGIC (Hard Deadzone)
+      // BIKE-SMOOTH SPEED LOGIC (Balanced Response)
       // ---------------------------------------------------------
       
       // 1. Compute horizontal magnitude (X & Y axes only)
@@ -69,11 +68,11 @@ export default function AccelerometerPage() {
 
       // 3. Integration & Damping
       if (current_a > 0) {
-        // Accelerating: Use a realistic integration step (0.1s)
-        speedMSRef.current = speedMSRef.current + (current_a * 0.1);
+        // Accelerating: Controlled increase (Gain: 0.05)
+        speedMSRef.current = speedMSRef.current + (current_a * 0.05);
       } else {
-        // No movement: Apply bike-style roll-off damping (0.88)
-        speedMSRef.current = speedMSRef.current * 0.88;
+        // No movement: Faster damping for rapid speed drop (Factor: 0.75)
+        speedMSRef.current = speedMSRef.current * 0.75;
       }
 
       // 4. Convert to km/h for the UI
@@ -81,8 +80,8 @@ export default function AccelerometerPage() {
 
       // 5. Smoothing (EMA) & Clamping
       setSpeed(prev => {
-        // Smooth for bike-feel response (0.70 EMA)
-        let smoothed = (0.70 * prev) + (0.30 * speed_kmh_raw);
+        // More reactive smoothing (0.50 EMA) for faster visual deceleration
+        let smoothed = (0.50 * prev) + (0.50 * speed_kmh_raw);
         
         // Force zero for still sensor
         if (smoothed < 0.5) smoothed = 0;
@@ -93,7 +92,7 @@ export default function AccelerometerPage() {
         const finalSpeed = Math.max(0, smoothed);
         if (finalSpeed > maxSpeedValue) setMaxSpeedValue(finalSpeed);
         
-        // Sync internal velocity back to the smoothed readout to prevent drift
+        // Sync internal velocity back to the smoothed readout
         speedMSRef.current = finalSpeed / 3.6;
         
         return finalSpeed;
