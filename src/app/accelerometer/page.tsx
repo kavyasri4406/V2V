@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Activity, Zap, Gauge, ArrowRightLeft, MoveVertical, MoveHorizontal, RefreshCcw, History, TriangleAlert, Info } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useFirebase, errorEmitter } from '@/firebase';
-import { ref, onValue, off } from 'firebase/database';
+import { ref, onValue, off, set } from 'firebase/database';
 import {
   ChartContainer,
   ChartTooltip,
@@ -31,6 +31,7 @@ export default function AccelerometerPage() {
   const [maxForceValue, setMaxForceValue] = useState(0);
   const [maxSpeedValue, setMaxSpeedValue] = useState(0);
   const [speed, setSpeed] = useState(0);
+  const [isCrashed, setIsCrashed] = useState(false);
   
   const { toast } = useToast();
   const { database } = useFirebase();
@@ -38,6 +39,7 @@ export default function AccelerometerPage() {
   
   // Accumulated speed in m/s
   const speedMSRef = useRef(0);
+  const lastImpactTimeRef = useRef<number>(0);
 
   const chartConfig = {
     x: { label: "Longitudinal", color: "hsl(var(--primary))" },
@@ -54,48 +56,76 @@ export default function AccelerometerPage() {
     if (!active || !database) return;
 
     const sensorRef = ref(database, 'car_kit/mpu6050_raw/accelerometer');
+    const crashAlertRef = ref(database, 'car_kit/crash_alert');
     
     const unsubscribe = onValue(sensorRef, (snapshot) => {
       const val = snapshot.val();
       if (!val) return;
 
-      // 1. Convert raw to m/s2 (raw / 16384 * 9.81)
-      const ax_ms2 = (Number(val.x) / 16384) * 9.81;
-      const ay_ms2 = (Number(val.y) / 16384) * 9.81;
-      const az_ms2 = (Number(val.z) / 16384) * 9.81;
+      // 1. Convert raw to m/s2 (assuming 16384 LSB/g)
+      const ax = (Number(val.x) / 16384) * 9.81;
+      const ay = (Number(val.y) / 16384) * 9.81;
+      const az = (Number(val.z) / 16384) * 9.81;
 
-      // 2. Gravity compensation (Z-axis)
-      const az_corrected = az_ms2 - 9.81;
+      // ---------------------------------------------------------
+      // BIKE-SMOOTH SPEED LOGIC (TEMPORARY SLOW MODE)
+      // ---------------------------------------------------------
       
-      // 3. Compute horizontal acceleration
-      const horizontal_a = Math.sqrt(ax_ms2 * ax_ms2 + ay_ms2 * ay_ms2);
+      // 1. Compute horizontal magnitude
+      const horizontal_a = Math.sqrt(ax * ax + ay * ay);
 
-      // Noise gate: ignore values below 0.15 m/s2 to prevent static drift
-      const NOISE_THRESHOLD = 0.15;
-      const filtered_a = horizontal_a > NOISE_THRESHOLD ? horizontal_a : 0;
+      // 2. HARD noise filter (stops noise-based drift)
+      const filter_a = horizontal_a > 0.65 ? horizontal_a : 0;
 
-      // Resultant total for G-force monitoring
-      const total_a = Math.sqrt(horizontal_a * horizontal_a + az_corrected * az_corrected);
+      // 3. Integration with TEMPORARY VERY SLOW gain (0.01 instead of 1.0)
+      if (filter_a > 0) {
+        speedMSRef.current = speedMSRef.current + (filter_a * 0.01);
+      } else {
+        // gradual fall like a bike
+        speedMSRef.current = speedMSRef.current * 0.88;
+      }
 
-      // 4. Integrate speed (m/s) - delta time is fixed 1s as per sensor frequency
-      speedMSRef.current = speedMSRef.current + (filtered_a * 1);
-      
-      // 5. Convert to km/h
-      const current_kmh = speedMSRef.current * 3.6;
+      // 4. Convert to km/h
+      let speed_kmh = speedMSRef.current * 3.6;
 
-      // 6. Smoothing (EMA) and peak tracking
+      // 5. Apply smoothing (0.7 EMA)
       setSpeed(prev => {
-        const smoothed = (0.8 * prev) + (0.2 * current_kmh);
-        const clamped = Math.max(0, smoothed);
-        if (clamped > maxSpeedValue) setMaxSpeedValue(clamped);
-        return clamped;
+        let smoothed = (0.70 * prev) + (0.30 * speed_kmh);
+        
+        // 6. Clamp unrealistic spikes and set TEMPORARY MAX of 2.0
+        if (smoothed > prev + 8) smoothed = prev + 8;
+        if (smoothed < 0.5) smoothed = 0;
+        
+        const finalSpeed = Math.min(smoothed, 2.0); // HARD LIMIT AT 2.0
+        
+        if (finalSpeed > maxSpeedValue) setMaxSpeedValue(finalSpeed);
+        return finalSpeed;
       });
 
+      // ---------------------------------------------------------
+      // CRASH DETECTION (G-Force > 2.5g)
+      // ---------------------------------------------------------
+      const gx = Number(val.x) / 16384;
+      const gy = Number(val.y) / 16384;
+      const gz = Number(val.z) / 16384;
+      const impact_g = Math.sqrt(gx*gx + gy*gy + gz*gz) - 1.0;
+
+      if (impact_g >= 2.5) {
+        setIsCrashed(true);
+        lastImpactTimeRef.current = Date.now();
+        set(crashAlertRef, true);
+      } else if (isCrashed && Date.now() - lastImpactTimeRef.current > 3000) {
+        // Reset after 3 seconds of stability
+        setIsCrashed(false);
+        set(crashAlertRef, false);
+      }
+
       const timeLabel = new Date().toLocaleTimeString([], { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
-      const newPoint = { time: timeLabel, x: ax_ms2, y: ay_ms2, z: az_ms2, total: total_a };
+      const resultant_ms2 = Math.sqrt(ax * ax + ay * ay + (az - 9.81) * (az - 9.81));
+      const newPoint = { time: timeLabel, x: ax, y: ay, z: az, total: resultant_ms2 };
       
       setCurrent(newPoint);
-      setMaxForceValue(prev => Math.max(prev, total_a));
+      setMaxForceValue(prev => Math.max(prev, resultant_ms2));
 
       dataRef.current = [...dataRef.current, newPoint].slice(-40);
       setData([...dataRef.current]);
@@ -106,22 +136,22 @@ export default function AccelerometerPage() {
     return () => {
       off(sensorRef);
     };
-  }, [active, database, maxSpeedValue]);
+  }, [active, database, maxSpeedValue, isCrashed]);
 
   const resetTelemetry = () => {
     speedMSRef.current = 0;
     setSpeed(0);
     setMaxSpeedValue(0);
     setMaxForceValue(0);
-    toast({ title: 'Telemetry Reset', description: 'Session data and odometer zeroed.' });
+    toast({ title: 'Telemetry Reset', description: 'Session data zeroed.' });
   };
 
   // SVG Gauge calculations
   const radius = 90;
   const circumference = 2 * Math.PI * radius;
-  const maxSpeedRange = 140; // Max visual range of the gauge
-  const percentage = Math.min(speed / maxSpeedRange, 1);
-  const strokeDashoffset = circumference - (percentage * circumference * 0.75); // 270 degree arc
+  const maxVisualRange = 140; 
+  const percentage = Math.min(speed / maxVisualRange, 1);
+  const strokeDashoffset = circumference - (percentage * circumference * 0.75); 
 
   if (!isMounted) return null;
 
@@ -131,10 +161,12 @@ export default function AccelerometerPage() {
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
         <div>
           <h1 className="text-3xl font-black tracking-tighter uppercase italic flex items-center gap-3">
-            <Activity className="text-primary h-8 w-8" />
+            <Activity className={cn("h-8 w-8", isCrashed ? "text-destructive animate-ping" : "text-primary")} />
             V2V Telemetry
           </h1>
-          <p className="text-muted-foreground text-xs font-bold uppercase tracking-widest opacity-60">Real-time MPU6050 Hardware Sync</p>
+          <p className="text-muted-foreground text-xs font-bold uppercase tracking-widest opacity-60">
+            {isCrashed ? "CRITICAL IMPACT DETECTED" : "Real-time MPU6050 Hardware Sync"}
+          </p>
         </div>
         <div className="flex items-center gap-3 w-full md:w-auto">
           <Button 
@@ -143,7 +175,7 @@ export default function AccelerometerPage() {
             onClick={resetTelemetry}
             className="flex-1 md:flex-none border-border/50 font-bold uppercase tracking-widest"
           >
-            <RefreshCcw className="mr-2 h-4 w-4" /> Reset Trip
+            <RefreshCcw className="mr-2 h-4 w-4" /> Reset
           </Button>
           <Button 
             variant={active ? "destructive" : "default"} 
@@ -157,20 +189,18 @@ export default function AccelerometerPage() {
         </div>
       </div>
 
-      {/* Main Speedometer Housing - Circular Frame */}
+      {/* Speedometer Gauge */}
       <div className="flex justify-center py-8">
-        <Card className="w-[340px] h-[340px] md:w-[400px] md:h-[400px] rounded-full bg-card border-[8px] border-muted/50 overflow-hidden shadow-[0_0_50px_rgba(0,0,0,0.2)] relative flex flex-col items-center justify-center group transition-all duration-700">
-          {/* Neon Glow Effect */}
-          <div className={cn(
-            "absolute inset-0 bg-gradient-to-br from-primary/5 to-accent/5 opacity-0 transition-opacity duration-500",
-            active && "opacity-100"
-          )} />
-          
+        <Card className={cn(
+          "w-[340px] h-[340px] md:w-[400px] md:h-[400px] rounded-full bg-card border-[8px] overflow-hidden shadow-[0_0_50px_rgba(0,0,0,0.2)] relative flex flex-col items-center justify-center transition-all duration-500",
+          isCrashed ? "border-destructive animate-pulse shadow-[0_0_80px_rgba(255,0,0,0.4)]" : "border-muted/50"
+        )}>
+          {/* Status Indicators */}
           <div className="absolute top-12 flex flex-col items-center gap-1 z-20">
             <div className="flex items-center gap-2">
               <div className={cn("w-2 h-2 rounded-full", active ? "bg-primary animate-pulse shadow-[0_0_8px_rgba(var(--primary),0.8)]" : "bg-zinc-700")} />
               <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
-                {active ? "Link Active" : "Standby"}
+                {active ? (isCrashed ? "IMPACT" : "Link Active") : "Standby"}
               </span>
             </div>
           </div>
@@ -178,7 +208,6 @@ export default function AccelerometerPage() {
           {/* SVG Gauge */}
           <div className="relative z-10">
             <svg width="240" height="240" viewBox="0 0 200 200" className="transform -rotate-225">
-              {/* Background Arc */}
               <circle
                 cx="100"
                 cy="100"
@@ -190,7 +219,6 @@ export default function AccelerometerPage() {
                 className="text-muted/20"
                 strokeLinecap="round"
               />
-              {/* Progress Arc */}
               <circle
                 cx="100"
                 cy="100"
@@ -201,33 +229,21 @@ export default function AccelerometerPage() {
                 strokeDasharray={`${circumference * 0.75} ${circumference}`}
                 strokeDashoffset={strokeDashoffset}
                 className={cn(
-                  "text-primary transition-all duration-700 ease-out",
-                  speed > 100 ? "text-destructive" : "text-primary"
+                  "transition-all duration-700 ease-out",
+                  isCrashed ? "text-destructive" : "text-primary"
                 )}
                 strokeLinecap="round"
                 style={{ filter: 'drop-shadow(0 0 8px currentColor)' }}
               />
-              
-              {/* Ticks */}
-              {[...Array(9)].map((_, i) => (
-                <line
-                  key={i}
-                  x1="100"
-                  y1="20"
-                  x2="100"
-                  y2="30"
-                  transform={`rotate(${i * 33.75 + 45} 100 100)`}
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  className="text-muted-foreground/30"
-                />
-              ))}
             </svg>
 
             {/* Central Speed Readout */}
             <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
               <div className="space-y-0 -mt-4">
-                <span className="text-6xl md:text-7xl font-black tracking-tighter tabular-nums leading-none block">
+                <span className={cn(
+                  "text-6xl md:text-7xl font-black tracking-tighter tabular-nums leading-none block",
+                  isCrashed && "text-destructive"
+                )}>
                   {speed.toFixed(1)}
                 </span>
                 <span className="text-lg font-black text-primary italic uppercase tracking-tighter">km/h</span>
@@ -241,9 +257,12 @@ export default function AccelerometerPage() {
                 transform: `translateX(-50%) rotate(${percentage * 270 - 135}deg)` 
               }}
             >
-              <div className="w-full h-full bg-gradient-to-t from-transparent via-accent to-accent rounded-full shadow-[0_0_10px_rgba(255,100,100,0.5)]" />
+              <div className={cn(
+                "w-full h-full rounded-full shadow-lg",
+                isCrashed ? "bg-destructive" : "bg-gradient-to-t from-transparent via-accent to-accent"
+              )} />
             </div>
-            <div className="absolute top-1/2 left-1/2 -ml-3 -mt-3 w-6 h-6 bg-card border-4 border-muted rounded-full z-40 shadow-xl" />
+            <div className="absolute top-1/2 left-1/2 -ml-3 -mt-3 w-6 h-6 bg-card border-4 border-muted rounded-full z-40" />
           </div>
 
           <div className="absolute bottom-12 flex flex-col items-center gap-1 z-20">
@@ -254,30 +273,23 @@ export default function AccelerometerPage() {
                </div>
                <div className="w-px h-6 bg-muted/20" />
                <div className="text-center">
-                 <p className="text-[9px] font-black text-muted-foreground uppercase tracking-widest">Impact</p>
-                 <p className="text-sm font-black italic text-accent">{(maxForceValue / 9.81).toFixed(2)}G</p>
+                 <p className="text-[9px] font-black text-muted-foreground uppercase tracking-widest">Load</p>
+                 <p className="text-sm font-black italic text-accent">{(current.total / 9.81).toFixed(2)}G</p>
                </div>
              </div>
           </div>
-
-          {speed > 100 && (
-             <div className="absolute bottom-6 flex items-center gap-2 px-4 py-1 bg-destructive/10 text-destructive rounded-full animate-bounce">
-                <TriangleAlert className="h-3 w-3" />
-                <span className="text-[9px] font-black uppercase tracking-widest">Velocity Warn</span>
-             </div>
-          )}
         </Card>
       </div>
 
-      {/* Secondary Telemetry Grid */}
+      {/* Telemetry Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         {[
-          { label: "Longitudinal (X)", val: current.x, color: "text-primary", icon: MoveHorizontal, desc: "Accel / Braking" },
-          { label: "Lateral (Y)", val: current.y, color: "text-accent", icon: ArrowRightLeft, desc: "Cornering Force" },
-          { label: "Vertical (Z)", val: current.z, color: "text-chart-1", icon: MoveVertical, desc: "Road Surface" },
-          { label: "Resultant (G)", val: current.total / 9.81, color: "text-foreground", icon: Activity, desc: "Total Net Force" }
+          { label: "Longitudinal", val: current.x, color: "text-primary", icon: MoveHorizontal, desc: "X-Axis" },
+          { label: "Lateral", val: current.y, color: "text-accent", icon: ArrowRightLeft, desc: "Y-Axis" },
+          { label: "Vertical", val: current.z, color: "text-chart-1", icon: MoveVertical, desc: "Z-Axis" },
+          { label: "Resultant", val: current.total, color: "text-foreground", icon: Activity, desc: "m/s²" }
         ].map((stat, i) => (
-          <Card key={i} className="bg-card border-border/40 shadow-sm hover:border-primary/20 transition-all group overflow-hidden">
+          <Card key={i} className="bg-card border-border/40 shadow-sm overflow-hidden">
             <div className={cn("h-1 w-full", stat.color.replace('text-', 'bg-'))} />
             <CardHeader className="pb-1 pt-4 px-4">
               <div className="flex items-center gap-2">
@@ -295,63 +307,10 @@ export default function AccelerometerPage() {
         ))}
       </div>
 
-      {/* Real-time Oscilloscope */}
-      <Card className="border-border/40 shadow-lg overflow-hidden">
-        <CardHeader className="flex flex-row items-center justify-between pb-2 bg-muted/5 border-b">
-          <div className="flex items-center gap-2">
-            <History className="h-4 w-4 text-muted-foreground" />
-            <span className="text-[10px] font-black uppercase tracking-widest">Live Waveform Stream</span>
-          </div>
-          {active && (
-            <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-primary/10 text-primary text-[9px] font-black uppercase tracking-widest border border-primary/20">
-              <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
-              Real-time Buffer
-            </div>
-          )}
-        </CardHeader>
-        <CardContent className="h-[300px] pt-6">
-          {!active ? (
-            <div className="h-full w-full border border-dashed rounded-xl flex flex-col items-center justify-center text-muted-foreground/30 gap-3 bg-muted/5">
-              <Gauge className="h-8 w-8 opacity-20" />
-              <p className="text-[10px] font-black uppercase tracking-[0.3em]">Hardware Synchronization Offline</p>
-            </div>
-          ) : (
-            <ChartContainer config={chartConfig} className="h-full w-full">
-              <LineChart data={data} margin={{ top: 10, right: 10, left: 10, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} opacity={0.05} />
-                <XAxis 
-                  dataKey="time" 
-                  axisLine={false} 
-                  tickLine={false} 
-                  fontSize={9} 
-                  interval="preserveStartEnd"
-                  stroke="currentColor"
-                  opacity={0.3}
-                />
-                <YAxis axisLine={false} tickLine={false} fontSize={9} stroke="currentColor" opacity={0.3} />
-                <ChartTooltip content={<ChartTooltipContent />} />
-                <Line type="monotone" dataKey="x" stroke="var(--color-x)" strokeWidth={2} dot={false} isAnimationActive={false} />
-                <Line type="monotone" dataKey="y" stroke="var(--color-y)" strokeWidth={2} dot={false} isAnimationActive={false} />
-                <Line type="monotone" dataKey="z" stroke="var(--color-z)" strokeWidth={2} dot={false} isAnimationActive={false} />
-                <Line 
-                  type="stepAfter" 
-                  dataKey="total" 
-                  stroke="var(--color-total)" 
-                  strokeWidth={2} 
-                  strokeDasharray="4 4"
-                  dot={false} 
-                  isAnimationActive={false} 
-                />
-              </LineChart>
-            </ChartContainer>
-          )}
-        </CardContent>
-      </Card>
-
       <div className="flex items-center gap-2 p-4 bg-muted/20 border border-border/50 rounded-lg">
           <Info className="h-4 w-4 text-primary shrink-0" />
           <p className="text-[10px] font-bold text-muted-foreground uppercase leading-relaxed tracking-wide">
-            Calculation Note: Speed is estimated by integrating horizontal G-forces (Ax, Ay) over the 1s sensor interval. Earth's gravity (~9.81 m/s²) is compensated on the Z-axis. Smoothing is applied via a 0.8 EMA filter.
+            Mode: Safe Testing. Speed logic uses a 0.65 threshold and 0.01 gain (Capped at 2.0 km/h) to prevent noise spikes during initial hardware sync.
           </p>
       </div>
     </div>
