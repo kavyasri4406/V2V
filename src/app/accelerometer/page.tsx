@@ -7,12 +7,6 @@ import { Activity, Zap, Gauge, ArrowRightLeft, MoveVertical, MoveHorizontal, Ref
 import { useToast } from '@/hooks/use-toast';
 import { useFirebase, errorEmitter } from '@/firebase';
 import { ref, onValue, off, set } from 'firebase/database';
-import {
-  ChartContainer,
-  ChartTooltip,
-  ChartTooltipContent,
-} from "@/components/ui/chart";
-import { Line, LineChart, XAxis, YAxis, CartesianGrid } from "recharts";
 import { cn } from '@/lib/utils';
 
 type AccelPoint = {
@@ -26,7 +20,6 @@ type AccelPoint = {
 export default function AccelerometerPage() {
   const [active, setActive] = useState(false);
   const [isMounted, setIsMounted] = useState(false);
-  const [data, setData] = useState<AccelPoint[]>([]);
   const [current, setCurrent] = useState<AccelPoint>({ time: '', x: 0, y: 0, z: 0, total: 0 });
   const [maxForceValue, setMaxForceValue] = useState(0);
   const [maxSpeedValue, setMaxSpeedValue] = useState(0);
@@ -35,18 +28,10 @@ export default function AccelerometerPage() {
   
   const { toast } = useToast();
   const { database } = useFirebase();
-  const dataRef = useRef<AccelPoint[]>([]);
   
-  // Accumulated speed in m/s
+  // High-precision refs for the physics loop
   const speedMSRef = useRef(0);
   const lastImpactTimeRef = useRef<number>(0);
-
-  const chartConfig = {
-    x: { label: "Longitudinal", color: "hsl(var(--primary))" },
-    y: { label: "Lateral", color: "hsl(var(--accent))" },
-    z: { label: "Vertical", color: "hsl(var(--chart-1))" },
-    total: { label: "Resultant", color: "hsl(var(--foreground))" },
-  };
 
   useEffect(() => {
     setIsMounted(true);
@@ -62,43 +47,47 @@ export default function AccelerometerPage() {
       const val = snapshot.val();
       if (!val) return;
 
-      // 1. Convert raw to m/s2 (assuming 16384 LSB/g)
+      // 1. Convert raw to m/s2 (Standard MPU6050 LSB/g)
       const ax = (Number(val.x) / 16384) * 9.81;
       const ay = (Number(val.y) / 16384) * 9.81;
       const az = (Number(val.z) / 16384) * 9.81;
 
       // ---------------------------------------------------------
-      // BIKE-SMOOTH SPEED LOGIC (PRODUCTION MODE)
+      // BIKE-SMOOTH SPEED LOGIC (Correct Integration)
       // ---------------------------------------------------------
       
-      // 1. Compute horizontal magnitude
+      // 1. Compute horizontal magnitude (Ignore Z to avoid gravity noise)
       const horizontal_a = Math.sqrt(ax * ax + ay * ay);
 
-      // 2. HARD noise filter (stops all noise from increasing speed)
+      // 2. HARD noise filter (Stops sensor jitter from building speed)
       const filter_a = horizontal_a > 0.65 ? horizontal_a : 0;
 
-      // 3. Integration with 1.0 gain for realistic velocity accumulation
+      // 3. Integration & Damping
       if (filter_a > 0) {
-        speedMSRef.current = speedMSRef.current + (filter_a * 1.0);
+        // Use a realistic time-step (e.g., 0.1s) for smoother accumulation
+        speedMSRef.current = speedMSRef.current + (filter_a * 0.1);
       } else {
-        // gradual fall like a bike
+        // Gradual roll-off when no movement is detected
         speedMSRef.current = speedMSRef.current * 0.88;
       }
 
-      // 4. Convert to km/h
+      // 4. Convert internal m/s to km/h for display
       let speed_kmh_raw = speedMSRef.current * 3.6;
 
-      // 5. Apply smoothing (0.7 EMA) and clamping
+      // 5. Smoothing & Clamping (EMA + Safety Cap)
       setSpeed(prev => {
         let smoothed = (0.70 * prev) + (0.30 * speed_kmh_raw);
         
-        // 6. Clamp unrealistic spikes and force zero for stillness
-        if (smoothed > prev + 8) smoothed = prev + 8;
+        // 6. Force zero for stillness and clamp unrealistic spikes
         if (smoothed < 0.5) smoothed = 0;
+        if (smoothed > prev + 8) smoothed = prev + 8;
         
         const finalSpeed = Math.max(0, smoothed);
-        
         if (finalSpeed > maxSpeedValue) setMaxSpeedValue(finalSpeed);
+        
+        // Sync internal m/s back to the smoothed km/h to prevent drift
+        speedMSRef.current = finalSpeed / 3.6;
+        
         return finalSpeed;
       });
 
@@ -115,20 +104,23 @@ export default function AccelerometerPage() {
         lastImpactTimeRef.current = Date.now();
         set(crashAlertRef, true);
       } else if (isCrashed && Date.now() - lastImpactTimeRef.current > 3000) {
-        // Reset after 3 seconds of stability
+        // Reset only after 3 seconds of stability below impact threshold
         setIsCrashed(false);
         set(crashAlertRef, false);
       }
 
       const timeLabel = new Date().toLocaleTimeString([], { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
       const resultant_ms2 = Math.sqrt(ax * ax + ay * ay + (az - 9.81) * (az - 9.81));
-      const newPoint = { time: timeLabel, x: ax, y: ay, z: az, total: resultant_ms2 };
       
-      setCurrent(newPoint);
+      setCurrent({ 
+        time: timeLabel, 
+        x: ax, 
+        y: ay, 
+        z: az, 
+        total: resultant_ms2 
+      });
+      
       setMaxForceValue(prev => Math.max(prev, resultant_ms2));
-
-      dataRef.current = [...dataRef.current, newPoint].slice(-40);
-      setData([...dataRef.current]);
     }, (error) => {
       errorEmitter.emit('permission-error', error as any);
     });
@@ -143,10 +135,10 @@ export default function AccelerometerPage() {
     setSpeed(0);
     setMaxSpeedValue(0);
     setMaxForceValue(0);
-    toast({ title: 'Telemetry Reset', description: 'Session data zeroed.' });
+    toast({ title: 'Telemetry Reset', description: 'Internal velocity zeroed.' });
   };
 
-  // SVG Gauge calculations
+  // Speedometer visual logic
   const radius = 90;
   const circumference = 2 * Math.PI * radius;
   const maxVisualRange = 140; 
@@ -189,7 +181,7 @@ export default function AccelerometerPage() {
         </div>
       </div>
 
-      {/* Speedometer Gauge */}
+      {/* Circular Speedometer Gauge */}
       <div className="flex justify-center py-8">
         <Card className={cn(
           "w-[340px] h-[340px] md:w-[400px] md:h-[400px] rounded-full bg-card border-[8px] overflow-hidden shadow-[0_0_50px_rgba(0,0,0,0.2)] relative flex flex-col items-center justify-center transition-all duration-500",
@@ -250,7 +242,7 @@ export default function AccelerometerPage() {
               </div>
             </div>
 
-            {/* Needle */}
+            {/* Animated Needle */}
             <div 
               className="absolute top-1/2 left-1/2 w-1 h-32 -mt-32 -ml-0.5 origin-bottom transition-transform duration-700 ease-out z-30"
               style={{ 
@@ -265,6 +257,7 @@ export default function AccelerometerPage() {
             <div className="absolute top-1/2 left-1/2 -ml-3 -mt-3 w-6 h-6 bg-card border-4 border-muted rounded-full z-40" />
           </div>
 
+          {/* Secondary Stats Overlay */}
           <div className="absolute bottom-12 flex flex-col items-center gap-1 z-20">
              <div className="flex gap-4">
                <div className="text-center">
@@ -281,13 +274,13 @@ export default function AccelerometerPage() {
         </Card>
       </div>
 
-      {/* Telemetry Grid */}
+      {/* Axis Telemetry Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         {[
-          { label: "Longitudinal", val: current.x, color: "text-primary", icon: MoveHorizontal, desc: "X-Axis" },
-          { label: "Lateral", val: current.y, color: "text-accent", icon: ArrowRightLeft, desc: "Y-Axis" },
-          { label: "Vertical", val: current.z, color: "text-chart-1", icon: MoveVertical, desc: "Z-Axis" },
-          { label: "Resultant", val: current.total, color: "text-foreground", icon: Activity, desc: "m/s²" }
+          { label: "Longitudinal", val: current.x, color: "text-primary", icon: MoveHorizontal, desc: "X-Axis (m/s²)" },
+          { label: "Lateral", val: current.y, color: "text-accent", icon: ArrowRightLeft, desc: "Y-Axis (m/s²)" },
+          { label: "Vertical", val: current.z, color: "text-chart-1", icon: MoveVertical, desc: "Z-Axis (m/s²)" },
+          { label: "Resultant", val: current.total, color: "text-foreground", icon: Activity, desc: "Net Force (m/s²)" }
         ].map((stat, i) => (
           <Card key={i} className="bg-card border-border/40 shadow-sm overflow-hidden">
             <div className={cn("h-1 w-full", stat.color.replace('text-', 'bg-'))} />
