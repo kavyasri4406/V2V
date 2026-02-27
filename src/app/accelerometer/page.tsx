@@ -29,9 +29,10 @@ export default function AccelerometerPage() {
   const { toast } = useToast();
   const { database } = useFirebase();
   
-  // High-precision refs for the physics loop
+  // High-precision ref for velocity integration
   const speedMSRef = useRef(0);
   const lastImpactTimeRef = useRef<number>(0);
+  const crashResetTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     setIsMounted(true);
@@ -47,45 +48,52 @@ export default function AccelerometerPage() {
       const val = snapshot.val();
       if (!val) return;
 
-      // 1. Convert raw to m/s2 (Standard MPU6050 LSB/g)
+      // 1. Convert raw values (MPU6050 LSB/g) to m/s2
+      // Using 16384 LSB/g for default +/- 2g range
       const ax = (Number(val.x) / 16384) * 9.81;
       const ay = (Number(val.y) / 16384) * 9.81;
       const az = (Number(val.z) / 16384) * 9.81;
 
       // ---------------------------------------------------------
-      // BIKE-SMOOTH SPEED LOGIC (Correct Integration)
+      // BIKE-SMOOTH SPEED LOGIC (Hard Deadzone)
       // ---------------------------------------------------------
       
-      // 1. Compute horizontal magnitude (Ignore Z to avoid gravity noise)
+      // 1. Compute horizontal magnitude (X & Y axes only)
       const horizontal_a = Math.sqrt(ax * ax + ay * ay);
 
-      // 2. HARD noise filter (Stops sensor jitter from building speed)
-      const filter_a = horizontal_a > 0.65 ? horizontal_a : 0;
+      // 2. HARD noise filter (0.65 m/s2)
+      let current_a = horizontal_a;
+      if (current_a < 0.65) {
+        current_a = 0;
+      }
 
       // 3. Integration & Damping
-      if (filter_a > 0) {
-        // Use a realistic time-step (e.g., 0.1s) for smoother accumulation
-        speedMSRef.current = speedMSRef.current + (filter_a * 0.1);
+      if (current_a > 0) {
+        // Accelerating: Use a realistic integration step (0.1s)
+        speedMSRef.current = speedMSRef.current + (current_a * 0.1);
       } else {
-        // Gradual roll-off when no movement is detected
+        // No movement: Apply bike-style roll-off damping (0.88)
         speedMSRef.current = speedMSRef.current * 0.88;
       }
 
-      // 4. Convert internal m/s to km/h for display
-      let speed_kmh_raw = speedMSRef.current * 3.6;
+      // 4. Convert to km/h for the UI
+      const speed_kmh_raw = speedMSRef.current * 3.6;
 
-      // 5. Smoothing & Clamping (EMA + Safety Cap)
+      // 5. Smoothing (EMA) & Clamping
       setSpeed(prev => {
+        // Smooth for bike-feel response (0.70 EMA)
         let smoothed = (0.70 * prev) + (0.30 * speed_kmh_raw);
         
-        // 6. Force zero for stillness and clamp unrealistic spikes
+        // Force zero for still sensor
         if (smoothed < 0.5) smoothed = 0;
+        
+        // Clamp unrealistic spikes (+8 km/h per sample max)
         if (smoothed > prev + 8) smoothed = prev + 8;
         
         const finalSpeed = Math.max(0, smoothed);
         if (finalSpeed > maxSpeedValue) setMaxSpeedValue(finalSpeed);
         
-        // Sync internal m/s back to the smoothed km/h to prevent drift
+        // Sync internal velocity back to the smoothed readout to prevent drift
         speedMSRef.current = finalSpeed / 3.6;
         
         return finalSpeed;
@@ -97,16 +105,34 @@ export default function AccelerometerPage() {
       const gx = Number(val.x) / 16384;
       const gy = Number(val.y) / 16384;
       const gz = Number(val.z) / 16384;
+      
+      // Impact magnitude in G-units (Subtracting 1.0 to remove standard gravity)
       const impact_g = Math.sqrt(gx*gx + gy*gy + gz*gz) - 1.0;
 
       if (impact_g >= 2.5) {
-        setIsCrashed(true);
+        if (!isCrashed) {
+          setIsCrashed(true);
+          set(crashAlertRef, true);
+          toast({ variant: 'destructive', title: 'IMPACT DETECTED', description: 'G-Force threshold exceeded.' });
+        }
         lastImpactTimeRef.current = Date.now();
-        set(crashAlertRef, true);
-      } else if (isCrashed && Date.now() - lastImpactTimeRef.current > 3000) {
-        // Reset only after 3 seconds of stability below impact threshold
-        setIsCrashed(false);
-        set(crashAlertRef, false);
+      } else if (isCrashed) {
+        // Reset only after 3 seconds of stability (impact < 1.0G)
+        if (impact_g < 1.0) {
+          if (!crashResetTimerRef.current) {
+            crashResetTimerRef.current = setTimeout(() => {
+              setIsCrashed(false);
+              set(crashAlertRef, false);
+              crashResetTimerRef.current = null;
+            }, 3000);
+          }
+        } else {
+          // Clear reset timer if force spikes again
+          if (crashResetTimerRef.current) {
+            clearTimeout(crashResetTimerRef.current);
+            crashResetTimerRef.current = null;
+          }
+        }
       }
 
       const timeLabel = new Date().toLocaleTimeString([], { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
@@ -127,14 +153,17 @@ export default function AccelerometerPage() {
 
     return () => {
       off(sensorRef);
+      if (crashResetTimerRef.current) clearTimeout(crashResetTimerRef.current);
     };
-  }, [active, database, maxSpeedValue, isCrashed]);
+  }, [active, database, maxSpeedValue, isCrashed, toast]);
 
   const resetTelemetry = () => {
     speedMSRef.current = 0;
     setSpeed(0);
     setMaxSpeedValue(0);
     setMaxForceValue(0);
+    setIsCrashed(false);
+    if (database) set(ref(database, 'car_kit/crash_alert'), false);
     toast({ title: 'Telemetry Reset', description: 'Internal velocity zeroed.' });
   };
 
