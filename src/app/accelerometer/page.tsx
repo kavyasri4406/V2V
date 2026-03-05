@@ -57,17 +57,17 @@ export default function AccelerometerPage() {
       // 2. Compute horizontal magnitude
       const horizontal_a = Math.sqrt(ax * ax + ay * ay);
       
-      // 3. Strong noise threshold
+      // 3. Strong noise threshold (0.8 m/s2)
       const isMoving = horizontal_a >= 0.8;
 
       setSpeed(prev => {
         let nextSpeed = prev;
 
-        // 4. If horizontal_a > 0, increase speed slowly
+        // 4. If horizontal_a > 0.8, increase speed slowly
         if (isMoving) {
           nextSpeed = prev + 1.5;
         } 
-        // 5. If horizontal_a == 0, decrease speed smoothly
+        // 5. If horizontal_a < 0.8 (no movement or slight noise), decrease speed smoothly
         else {
           nextSpeed = prev * 0.90;
         }
