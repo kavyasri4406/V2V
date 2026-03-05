@@ -57,19 +57,18 @@ export default function AccelerometerPage() {
       // 2. Compute horizontal magnitude
       let horizontal_a = Math.sqrt(ax_ms2 * ax_ms2 + ay_ms2 * ay_ms2);
       
-      // 3. Strong noise dead-zone: Ignore slight changes/noise
-      if (horizontal_a < 0.7) {
+      // 3. Precision Noise Threshold: Ignore vibrations and tilt
+      if (horizontal_a < 0.5) {
         horizontal_a = 0;
       }
 
-      // 4. Movement detection and integration
+      // 4. Movement Detection Logic
       if (horizontal_a > 0) {
-        // Real movement detected: Increase speed
-        // Using a small delta (0.1) for stability in high-frequency streams
-        speedMsRef.current += (horizontal_a * 0.1); 
+        // Real motion: Increment internal velocity state
+        speedMsRef.current += (horizontal_a * 0.08); 
       } else {
-        // No movement or slight changes: Reduce speed gradually
-        speedMsRef.current *= 0.80;
+        // Stationary or slight change: Decay velocity back to 0
+        speedMsRef.current *= 0.85;
       }
 
       // 5. Convert to km/h
@@ -77,16 +76,16 @@ export default function AccelerometerPage() {
 
       // 6. Smooth output and update state
       setSpeed(prev => {
-        // Apply 0.75 EMA smoothing
+        // Apply EMA smoothing for a professional gauge feel
         let nextKmh = (0.75 * prev) + (0.25 * speedKmhRaw);
 
-        // 7. Force zero when nearly stopped
+        // 7. Force zero when nearly stopped to prevent floating values
         if (nextKmh < 1.0) {
           nextKmh = 0;
           speedMsRef.current = 0;
         }
 
-        // 8. Safety clamp: Prevent unrealistic jumps (+10 km/h max per sample)
+        // 8. Safety clamp: Prevent unrealistic speed jumps
         if (nextKmh > prev + 10) {
           nextKmh = prev + 10;
         }
