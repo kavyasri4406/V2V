@@ -30,6 +30,7 @@ export default function AccelerometerPage() {
   const { database } = useFirebase();
   
   const crashResetTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const speedMsRef = useRef(0);
 
   useEffect(() => {
     setIsMounted(true);
@@ -55,34 +56,44 @@ export default function AccelerometerPage() {
       const az = (Number(val.z) / 16384) * 9.81;
 
       // 2. Compute horizontal magnitude
-      const horizontal_a = Math.sqrt(ax * ax + ay * ay);
+      let horizontal_a = Math.sqrt(ax * ax + ay * ay);
       
-      // 3. Strong noise threshold (0.8 m/s2)
-      const isMoving = horizontal_a >= 0.8;
+      // 3. Strong noise dead-zone
+      if (horizontal_a < 0.7) {
+        horizontal_a = 0;
+      }
 
+      // 4. Movement detection & Physical State Update
+      if (horizontal_a > 0) {
+        // Real movement detected
+        // deltaTime is scaled to 0.1 to match expected update frequency and prevent explosion
+        speedMsRef.current += (horizontal_a * 0.1); 
+      } else {
+        // No movement -> reduce speed gradually (20% reduction)
+        speedMsRef.current *= 0.80;
+      }
+
+      // 5. Convert to km/h
+      const speedKmhRaw = speedMsRef.current * 3.6;
+
+      // 6. Smooth and update output state
       setSpeed(prev => {
-        let nextSpeed = prev;
+        // Smooth output (75% previous, 25% current calculation)
+        let nextKmh = (0.75 * prev) + (0.25 * speedKmhRaw);
 
-        // 4. If horizontal_a > 0.8, increase speed slowly
-        if (isMoving) {
-          nextSpeed = prev + 1.5;
-        } 
-        // 5. If horizontal_a < 0.8 (no movement or slight noise), decrease speed smoothly
-        else {
-          nextSpeed = prev * 0.90;
+        // Force zero when nearly stopped
+        if (nextKmh < 1.0) {
+          nextKmh = 0;
+          speedMsRef.current = 0;
         }
 
-        // 6. Clamp speed
-        if (nextSpeed < 0.5) nextSpeed = 0;
-        if (nextSpeed > 120) nextSpeed = 120;
+        // Safety clamp: Prevent unrealistic spikes (+10 km/h max per sample)
+        if (nextKmh > prev + 10) {
+          nextKmh = prev + 10;
+        }
 
-        // 7. Smooth output (80% previous, 20% current calculation)
-        const smoothedSpeed = (0.8 * prev) + (0.2 * nextSpeed);
-        
-        const finalSpeed = smoothedSpeed < 0.1 ? 0 : smoothedSpeed;
-        
-        if (finalSpeed > maxSpeedValue) setMaxSpeedValue(finalSpeed);
-        return finalSpeed;
+        if (nextKmh > maxSpeedValue) setMaxSpeedValue(nextKmh);
+        return nextKmh;
       });
 
       // ---------------------------------------------------------
@@ -131,6 +142,7 @@ export default function AccelerometerPage() {
   }, [active, database, maxSpeedValue, isCrashed, toast]);
 
   const resetTelemetry = () => {
+    speedMsRef.current = 0;
     setSpeed(0);
     setMaxSpeedValue(0);
     setMaxForceValue(0);
