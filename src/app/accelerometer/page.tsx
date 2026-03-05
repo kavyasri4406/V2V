@@ -49,45 +49,44 @@ export default function AccelerometerPage() {
       const val = snapshot.val();
       if (!val) return;
 
-      // 1. Read accelerometer values in m/s2
-      // Using 16384 as standard sensitivity for MPU6050 +/- 2g range
-      const ax = (Number(val.x) / 16384) * 9.81;
-      const ay = (Number(val.y) / 16384) * 9.81;
-      const az = (Number(val.z) / 16384) * 9.81;
+      // 1. Read accelerometer values in m/s2 (16384 is sensitivity for +/- 2g)
+      const ax_ms2 = (Number(val.x) / 16384) * 9.81;
+      const ay_ms2 = (Number(val.y) / 16384) * 9.81;
+      const az_ms2 = (Number(val.z) / 16384) * 9.81;
 
       // 2. Compute horizontal magnitude
-      let horizontal_a = Math.sqrt(ax * ax + ay * ay);
+      let horizontal_a = Math.sqrt(ax_ms2 * ax_ms2 + ay_ms2 * ay_ms2);
       
-      // 3. Strong noise dead-zone
+      // 3. Strong noise dead-zone: Ignore slight changes/noise
       if (horizontal_a < 0.7) {
         horizontal_a = 0;
       }
 
-      // 4. Movement detection & Physical State Update
+      // 4. Movement detection and integration
       if (horizontal_a > 0) {
-        // Real movement detected
-        // deltaTime is scaled to 0.1 to match expected update frequency and prevent explosion
+        // Real movement detected: Increase speed
+        // Using a small delta (0.1) for stability in high-frequency streams
         speedMsRef.current += (horizontal_a * 0.1); 
       } else {
-        // No movement -> reduce speed gradually (20% reduction)
+        // No movement or slight changes: Reduce speed gradually
         speedMsRef.current *= 0.80;
       }
 
       // 5. Convert to km/h
       const speedKmhRaw = speedMsRef.current * 3.6;
 
-      // 6. Smooth and update output state
+      // 6. Smooth output and update state
       setSpeed(prev => {
-        // Smooth output (75% previous, 25% current calculation)
+        // Apply 0.75 EMA smoothing
         let nextKmh = (0.75 * prev) + (0.25 * speedKmhRaw);
 
-        // Force zero when nearly stopped
+        // 7. Force zero when nearly stopped
         if (nextKmh < 1.0) {
           nextKmh = 0;
           speedMsRef.current = 0;
         }
 
-        // Safety clamp: Prevent unrealistic spikes (+10 km/h max per sample)
+        // 8. Safety clamp: Prevent unrealistic jumps (+10 km/h max per sample)
         if (nextKmh > prev + 10) {
           nextKmh = prev + 10;
         }
@@ -121,13 +120,13 @@ export default function AccelerometerPage() {
       }
 
       const timeLabel = new Date().toLocaleTimeString([], { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
-      const resultant_ms2 = Math.sqrt(ax * ax + ay * ay + (az - 9.81) * (az - 9.81));
+      const resultant_ms2 = Math.sqrt(ax_ms2 * ax_ms2 + ay_ms2 * ay_ms2 + (az_ms2 - 9.81) * (az_ms2 - 9.81));
       
       setCurrent({ 
         time: timeLabel, 
-        x: ax, 
-        y: ay, 
-        z: az, 
+        x: ax_ms2, 
+        y: ay_ms2, 
+        z: az_ms2, 
         total: resultant_ms2 
       });
       
