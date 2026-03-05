@@ -29,7 +29,6 @@ export default function AccelerometerPage() {
   const { toast } = useToast();
   const { database } = useFirebase();
   
-  const speedMSRef = useRef(0);
   const crashResetTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
@@ -49,40 +48,40 @@ export default function AccelerometerPage() {
       const val = snapshot.val();
       if (!val) return;
 
-      // 1. Convert raw values to m/s2
+      // 1. Read accelerometer values in m/s2
+      // Using 16384 as standard sensitivity for MPU6050 +/- 2g range
       const ax = (Number(val.x) / 16384) * 9.81;
       const ay = (Number(val.y) / 16384) * 9.81;
       const az = (Number(val.z) / 16384) * 9.81;
 
-      // ---------------------------------------------------------
-      // BALANCED SPEED LOGIC
-      // ---------------------------------------------------------
+      // 2. Compute horizontal magnitude
       const horizontal_a = Math.sqrt(ax * ax + ay * ay);
       
-      // Strict noise gate to ensure 0 when stationary
-      let current_a = horizontal_a < 0.65 ? 0 : horizontal_a;
-
-      if (current_a > 0) {
-        // Accelerating: Lower gain for controlled increase (Realism)
-        speedMSRef.current = speedMSRef.current + (current_a * 0.02);
-      } else {
-        // No movement: Stronger damping for rapid speed drop (Fix: decrease faster)
-        speedMSRef.current = speedMSRef.current * 0.70;
-      }
-
-      const speed_kmh_raw = speedMSRef.current * 3.6;
+      // 3. Strong noise threshold
+      const isMoving = horizontal_a >= 0.8;
 
       setSpeed(prev => {
-        // Smoothing with higher weight on current to see drops faster
-        let smoothed = (0.4 * prev) + (0.6 * speed_kmh_raw);
+        let nextSpeed = prev;
+
+        // 4. If horizontal_a > 0, increase speed slowly
+        if (isMoving) {
+          nextSpeed = prev + 1.5;
+        } 
+        // 5. If horizontal_a == 0, decrease speed smoothly
+        else {
+          nextSpeed = prev * 0.90;
+        }
+
+        // 6. Clamp speed
+        if (nextSpeed < 0.5) nextSpeed = 0;
+        if (nextSpeed > 120) nextSpeed = 120;
+
+        // 7. Smooth output (80% previous, 20% current calculation)
+        const smoothedSpeed = (0.8 * prev) + (0.2 * nextSpeed);
         
-        if (smoothed < 0.3) smoothed = 0;
-        if (smoothed > prev + 5) smoothed = prev + 5; // Clamp spikes
+        const finalSpeed = smoothedSpeed < 0.1 ? 0 : smoothedSpeed;
         
-        const finalSpeed = Math.max(0, smoothed);
         if (finalSpeed > maxSpeedValue) setMaxSpeedValue(finalSpeed);
-        
-        speedMSRef.current = finalSpeed / 3.6;
         return finalSpeed;
       });
 
@@ -92,7 +91,7 @@ export default function AccelerometerPage() {
       const gx = Number(val.x) / 16384;
       const gy = Number(val.y) / 16384;
       const gz = Number(val.z) / 16384;
-      const impact_g = Math.sqrt(gx*gx + gy*gy + gz*gz) - 1.0;
+      const impact_g = Math.sqrt(gx * gx + gy * gy + gz * gz) - 1.0;
 
       if (impact_g >= 2.5) {
         if (!isCrashed) {
@@ -132,7 +131,6 @@ export default function AccelerometerPage() {
   }, [active, database, maxSpeedValue, isCrashed, toast]);
 
   const resetTelemetry = () => {
-    speedMSRef.current = 0;
     setSpeed(0);
     setMaxSpeedValue(0);
     setMaxForceValue(0);
