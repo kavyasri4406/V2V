@@ -57,38 +57,33 @@ export default function AccelerometerPage() {
       // 2. Compute horizontal magnitude
       let horizontal_a = Math.sqrt(ax_ms2 * ax_ms2 + ay_ms2 * ay_ms2);
       
-      // 3. Precision Noise Threshold: 1% sensitivity (0.1 m/s2)
-      if (horizontal_a < 0.1) {
-        horizontal_a = 0;
-      }
-
-      // 4. Movement Detection Logic (1% Balance)
-      if (horizontal_a > 0) {
-        // Increment speed with 1% gain
-        speedMsRef.current += (horizontal_a * 0.01); 
+      // 3. Movement Detection Logic (Physics-based Integration)
+      // Noise threshold: 0.5 m/s2 ensures minor vibrations don't trigger speed
+      if (horizontal_a > 0.5) {
+        // Accelerating: Increment speed physical state
+        // Calibrated gain for bike-like acceleration feel
+        speedMsRef.current += (horizontal_a * 0.2); 
       } else {
-        // Natural 1% decay per sample
-        speedMsRef.current *= 0.99;
+        // Stationary or minor noise: Decelerate speed physical state
+        // 15% decay factor ensures speed drops significantly faster than it gains
+        speedMsRef.current *= 0.85; 
       }
 
-      // 5. Convert to km/h
-      const speedKmhRaw = speedMsRef.current * 3.6;
+      // 4. Convert and Smooth Output
+      const currentKmhRaw = speedMsRef.current * 3.6;
 
-      // 6. Smooth output and update state
       setSpeed(prev => {
-        // 75/25 smoothing for a professional feel
-        let nextKmh = (0.75 * prev) + (0.25 * speedKmhRaw);
+        // 70/30 Smoothing for a stable readout
+        let nextKmh = (0.7 * prev) + (0.3 * currentKmhRaw);
 
-        // 7. Force zero when nearly stopped (1.0 km/h floor)
-        if (nextKmh < 1.0) {
+        // 5. Force Zero (Hard stop at low speeds)
+        if (nextKmh < 0.5) {
           nextKmh = 0;
           speedMsRef.current = 0;
         }
 
-        // 8. Safety clamp to prevent unrealistic speed jumps
-        if (nextKmh > prev + 10) {
-          nextKmh = prev + 10;
-        }
+        // 6. Safety Clamp
+        if (nextKmh > 140) nextKmh = 140;
 
         if (nextKmh > maxSpeedValue) setMaxSpeedValue(nextKmh);
         return nextKmh;
@@ -100,16 +95,17 @@ export default function AccelerometerPage() {
       const gx = Number(val.x) / 16384;
       const gy = Number(val.y) / 16384;
       const gz = Number(val.z) / 16384;
-      const impact_g = Math.sqrt(gx * gx + gy * gy + gz * gz) - 1.0;
+      const impact_g = Math.sqrt(gx * gx + gy * gy + gz * gz);
+      const resultant_g = Math.abs(impact_g - 1.0); // Adjust for gravity
 
-      if (impact_g >= 2.5) {
+      if (resultant_g >= 2.5) {
         if (!isCrashed) {
           setIsCrashed(true);
           set(crashAlertRef, true);
           toast({ variant: 'destructive', title: 'IMPACT DETECTED', description: 'Emergency broadcast triggered.' });
         }
       } else if (isCrashed) {
-        if (impact_g < 1.0 && !crashResetTimerRef.current) {
+        if (resultant_g < 1.0 && !crashResetTimerRef.current) {
           crashResetTimerRef.current = setTimeout(() => {
             setIsCrashed(false);
             set(crashAlertRef, false);
