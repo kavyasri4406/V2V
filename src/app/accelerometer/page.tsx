@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
@@ -58,26 +59,25 @@ export default function AccelerometerPage() {
       let horizontal_a = Math.sqrt(ax_ms2 * ax_ms2 + ay_ms2 * ay_ms2);
       
       // 3. Movement Detection Logic (Physics-based Integration)
-      // Noise threshold: 0.5 m/s2 ensures minor vibrations don't trigger speed
-      if (horizontal_a > 0.5) {
+      // Increasing logic remains identical to previous version as requested
+      if (horizontal_a > 0.55) {
         // Accelerating: Increment speed physical state
-        // Calibrated gain for bike-like acceleration feel
         speedMsRef.current += (horizontal_a * 0.2); 
       } else {
-        // Stationary or minor noise: Decelerate speed physical state
-        // 15% decay factor ensures speed drops significantly faster than it gains
-        speedMsRef.current *= 0.85; 
+        // AGGRESSIVE DECAY: Return to 0 ASAP when stable or below noise floor
+        // 55% reduction per sample ensures immediate feedback when stopping
+        speedMsRef.current *= 0.45; 
       }
 
       // 4. Convert and Smooth Output
       const currentKmhRaw = speedMsRef.current * 3.6;
 
       setSpeed(prev => {
-        // 70/30 Smoothing for a stable readout
-        let nextKmh = (0.7 * prev) + (0.3 * currentKmhRaw);
+        // 50/50 Smoothing for more reactive deceleration
+        let nextKmh = (0.5 * prev) + (0.5 * currentKmhRaw);
 
-        // 5. Force Zero (Hard stop at low speeds)
-        if (nextKmh < 0.5) {
+        // 5. Hard Zero Snap (Immediate stop at low speeds)
+        if (nextKmh < 0.2 || speedMsRef.current < 0.05) {
           nextKmh = 0;
           speedMsRef.current = 0;
         }
