@@ -57,18 +57,18 @@ export default function AccelerometerPage() {
       // 2. Compute horizontal magnitude
       let horizontal_a = Math.sqrt(ax_ms2 * ax_ms2 + ay_ms2 * ay_ms2);
       
-      // 3. Precision Noise Threshold: Ignore vibrations and tilt
-      if (horizontal_a < 0.5) {
+      // 3. Precision Noise Threshold: 1% sensitivity (0.1 m/s2)
+      if (horizontal_a < 0.1) {
         horizontal_a = 0;
       }
 
-      // 4. Movement Detection Logic
+      // 4. Movement Detection Logic (1% Balance)
       if (horizontal_a > 0) {
-        // Real motion: Increment internal velocity state
-        speedMsRef.current += (horizontal_a * 0.08); 
+        // Increment speed with 1% gain
+        speedMsRef.current += (horizontal_a * 0.01); 
       } else {
-        // Stationary or slight change: Decay velocity back to 0
-        speedMsRef.current *= 0.85;
+        // Natural 1% decay per sample
+        speedMsRef.current *= 0.99;
       }
 
       // 5. Convert to km/h
@@ -76,16 +76,16 @@ export default function AccelerometerPage() {
 
       // 6. Smooth output and update state
       setSpeed(prev => {
-        // Apply EMA smoothing for a professional gauge feel
+        // 75/25 smoothing for a professional feel
         let nextKmh = (0.75 * prev) + (0.25 * speedKmhRaw);
 
-        // 7. Force zero when nearly stopped to prevent floating values
+        // 7. Force zero when nearly stopped (1.0 km/h floor)
         if (nextKmh < 1.0) {
           nextKmh = 0;
           speedMsRef.current = 0;
         }
 
-        // 8. Safety clamp: Prevent unrealistic speed jumps
+        // 8. Safety clamp to prevent unrealistic speed jumps
         if (nextKmh > prev + 10) {
           nextKmh = prev + 10;
         }
@@ -165,7 +165,7 @@ export default function AccelerometerPage() {
             <Activity className={cn("h-8 w-8", isCrashed ? "text-destructive animate-ping" : "text-primary")} />
             V2V Telemetry
           </h1>
-          <p className="text-muted-foreground text-xs font-bold uppercase tracking-widest opacity-60">
+          <p className="text-muted-foreground text-[10px] font-black uppercase tracking-widest opacity-60">
             {isCrashed ? "CRITICAL IMPACT DETECTED" : "Real-time Vehicle Dynamics"}
           </p>
         </div>
@@ -192,7 +192,7 @@ export default function AccelerometerPage() {
 
       <div className="flex justify-center py-8">
         <Card className={cn(
-          "w-[340px] h-[340px] md:w-[400px] md:h-[400px] rounded-full bg-card border-[8px] relative flex flex-col items-center justify-center transition-all duration-300",
+          "w-[340px] h-[340px] md:w-[400px] md:h-[400px] rounded-full bg-card border-[8px] relative flex flex-col items-center justify-center transition-all duration-300 shadow-2xl",
           isCrashed ? "border-destructive animate-pulse" : "border-muted/50"
         )}>
           <div className="absolute top-12 flex flex-col items-center gap-1 z-20">
@@ -235,7 +235,7 @@ export default function AccelerometerPage() {
               className="absolute top-1/2 left-1/2 w-1 h-32 -mt-32 -ml-0.5 origin-bottom transition-transform duration-300 ease-out z-30"
               style={{ transform: `translateX(-50%) rotate(${percentage * 270 - 135}deg)` }}
             >
-              <div className={cn("w-full h-full rounded-full", isCrashed ? "bg-destructive" : "bg-accent")} />
+              <div className={cn("w-full h-full rounded-full shadow-[0_0_10px_rgba(0,0,0,0.5)]", isCrashed ? "bg-destructive" : "bg-accent")} />
             </div>
           </div>
 
@@ -261,7 +261,7 @@ export default function AccelerometerPage() {
           { label: "Vertical", val: current.z, color: "text-chart-1", icon: MoveVertical },
           { label: "Resultant", val: current.total, color: "text-foreground", icon: Activity }
         ].map((stat, i) => (
-          <Card key={i} className="bg-card border-border/40 overflow-hidden">
+          <Card key={i} className="bg-card border-border/40 overflow-hidden shadow-sm">
             <CardHeader className="pb-1 pt-4 px-4">
               <div className="flex items-center gap-2">
                 <stat.icon className={cn("h-3 w-3", stat.color)} />
