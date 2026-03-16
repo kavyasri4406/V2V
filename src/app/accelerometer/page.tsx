@@ -23,15 +23,12 @@ export default function AccelerometerPage() {
   const [isMounted, setIsMounted] = useState(false);
   const [current, setCurrent] = useState<AccelPoint>({ time: '', x: 0, y: 0, z: 0, total: 0 });
   const [maxForceValue, setMaxForceValue] = useState(0);
-  const [maxSpeedValue, setMaxSpeedValue] = useState(0);
-  const [speed, setSpeed] = useState(0);
   const [isCrashed, setIsCrashed] = useState(false);
   
   const { toast } = useToast();
   const { database } = useFirebase();
   
   const crashResetTimerRef = useRef<NodeJS.Timeout | null>(null);
-  const speedMsRef = useRef(0);
 
   useEffect(() => {
     setIsMounted(true);
@@ -50,73 +47,18 @@ export default function AccelerometerPage() {
       const val = snapshot.val();
       if (!val) return;
 
-      // 1. Read accelerometer values in m/s2 (16384 is sensitivity for +/- 2g)
+      // 1. Read accelerometer values and convert to m/s2 (16384 is sensitivity for +/- 2g)
       const ax_ms2 = (Number(val.x) / 16384) * 9.81;
       const ay_ms2 = (Number(val.y) / 16384) * 9.81;
       const az_ms2 = (Number(val.z) / 16384) * 9.81;
 
-      // 2. Compute horizontal magnitude
-      let horizontal_a = Math.sqrt(ax_ms2 * ax_ms2 + ay_ms2 * ay_ms2);
-      
-      // 3. Movement Detection Logic (Physics-based Integration)
-      // Increasing logic remains identical to previous version as requested
-      if (horizontal_a > 0.55) {
-        // Accelerating: Increment speed physical state
-        speedMsRef.current += (horizontal_a * 0.2); 
-      } else {
-        // AGGRESSIVE DECAY: Return to 0 ASAP when stable or below noise floor
-        // 55% reduction per sample ensures immediate feedback when stopping
-        speedMsRef.current *= 0.45; 
-      }
-
-      // 4. Convert and Smooth Output
-      const currentKmhRaw = speedMsRef.current * 3.6;
-
-      setSpeed(prev => {
-        // 50/50 Smoothing for more reactive deceleration
-        let nextKmh = (0.5 * prev) + (0.5 * currentKmhRaw);
-
-        // 5. Hard Zero Snap (Immediate stop at low speeds)
-        if (nextKmh < 0.2 || speedMsRef.current < 0.05) {
-          nextKmh = 0;
-          speedMsRef.current = 0;
-        }
-
-        // 6. Safety Clamp
-        if (nextKmh > 140) nextKmh = 140;
-
-        if (nextKmh > maxSpeedValue) setMaxSpeedValue(nextKmh);
-        return nextKmh;
-      });
-
-      // ---------------------------------------------------------
-      // CRASH DETECTION (G-Force > 2.5g)
-      // ---------------------------------------------------------
-      const gx = Number(val.x) / 16384;
-      const gy = Number(val.y) / 16384;
-      const gz = Number(val.z) / 16384;
-      const impact_g = Math.sqrt(gx * gx + gy * gy + gz * gz);
-      const resultant_g = Math.abs(impact_g - 1.0); // Adjust for gravity
-
-      if (resultant_g >= 2.5) {
-        if (!isCrashed) {
-          setIsCrashed(true);
-          set(crashAlertRef, true);
-          toast({ variant: 'destructive', title: 'IMPACT DETECTED', description: 'Emergency broadcast triggered.' });
-        }
-      } else if (isCrashed) {
-        if (resultant_g < 1.0 && !crashResetTimerRef.current) {
-          crashResetTimerRef.current = setTimeout(() => {
-            setIsCrashed(false);
-            set(crashAlertRef, false);
-            crashResetTimerRef.current = null;
-          }, 3000);
-        }
-      }
-
+      // 2. Compute resultant force magnitude (excluding gravity)
       const timeLabel = new Date().toLocaleTimeString([], { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
       const resultant_ms2 = Math.sqrt(ax_ms2 * ax_ms2 + ay_ms2 * ay_ms2 + (az_ms2 - 9.81) * (az_ms2 - 9.81));
       
+      const currentG = resultant_ms2 / 9.81;
+
+      // 3. Update State
       setCurrent({ 
         time: timeLabel, 
         x: ax_ms2, 
@@ -126,6 +68,26 @@ export default function AccelerometerPage() {
       });
       
       setMaxForceValue(prev => Math.max(prev, resultant_ms2));
+
+      // ---------------------------------------------------------
+      // CRASH DETECTION (G-Force > 2.5g)
+      // ---------------------------------------------------------
+      if (currentG >= 2.5) {
+        if (!isCrashed) {
+          setIsCrashed(true);
+          set(crashAlertRef, true);
+          toast({ variant: 'destructive', title: 'IMPACT DETECTED', description: 'Emergency broadcast triggered.' });
+        }
+      } else if (isCrashed) {
+        if (currentG < 1.0 && !crashResetTimerRef.current) {
+          crashResetTimerRef.current = setTimeout(() => {
+            setIsCrashed(false);
+            set(crashAlertRef, false);
+            crashResetTimerRef.current = null;
+          }, 3000);
+        }
+      }
+
     }, (error) => {
       errorEmitter.emit('permission-error', error as any);
     });
@@ -133,22 +95,23 @@ export default function AccelerometerPage() {
     return () => {
       off(sensorRef);
     };
-  }, [active, database, maxSpeedValue, isCrashed, toast]);
+  }, [active, database, isCrashed, toast]);
 
   const resetTelemetry = () => {
-    speedMsRef.current = 0;
-    setSpeed(0);
-    setMaxSpeedValue(0);
     setMaxForceValue(0);
     setIsCrashed(false);
     if (database) set(ref(database, 'car_kit/crash_alert'), false);
     toast({ title: 'Telemetry Reset' });
   };
 
+  const currentG = current.total / 9.81;
+  const maxG = maxForceValue / 9.81;
+
+  // Gauge Visuals (Repurposed for G-Force, range 0 to 4.0G)
   const radius = 90;
   const circumference = 2 * Math.PI * radius;
-  const maxVisualRange = 140; 
-  const percentage = Math.min(speed / maxVisualRange, 1);
+  const maxVisualRange = 4.0; 
+  const percentage = Math.min(currentG / maxVisualRange, 1);
   const strokeDashoffset = circumference - (percentage * circumference * 0.75); 
 
   if (!isMounted) return null;
@@ -162,7 +125,7 @@ export default function AccelerometerPage() {
             V2V Telemetry
           </h1>
           <p className="text-muted-foreground text-[10px] font-black uppercase tracking-widest opacity-60">
-            {isCrashed ? "CRITICAL IMPACT DETECTED" : "Real-time Vehicle Dynamics"}
+            {isCrashed ? "CRITICAL IMPACT DETECTED" : "Real-time G-Force Dynamics"}
           </p>
         </div>
         <div className="flex items-center gap-3 w-full md:w-auto">
@@ -195,7 +158,7 @@ export default function AccelerometerPage() {
             <div className="flex items-center gap-2">
               <div className={cn("w-2 h-2 rounded-full", active ? "bg-primary animate-pulse" : "bg-zinc-700")} />
               <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
-                {active ? "Link Active" : "Standby"}
+                {active ? "Sensor Active" : "Standby"}
               </span>
             </div>
           </div>
@@ -221,9 +184,9 @@ export default function AccelerometerPage() {
             <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
               <div className="space-y-0 -mt-4">
                 <span className={cn("text-6xl md:text-7xl font-black tracking-tighter tabular-nums leading-none block", isCrashed && "text-destructive")}>
-                  {speed.toFixed(1)}
+                  {currentG.toFixed(2)}
                 </span>
-                <span className="text-lg font-black text-primary italic uppercase tracking-tighter">km/h</span>
+                <span className="text-lg font-black text-primary italic uppercase tracking-tighter">G-Force</span>
               </div>
             </div>
 
@@ -238,12 +201,14 @@ export default function AccelerometerPage() {
           <div className="absolute bottom-12 flex flex-col items-center gap-1 z-20">
              <div className="flex gap-4">
                <div className="text-center">
-                 <p className="text-[9px] font-black text-muted-foreground uppercase tracking-widest">Peak</p>
-                 <p className="text-sm font-black italic">{maxSpeedValue.toFixed(1)}</p>
+                 <p className="text-[9px] font-black text-muted-foreground uppercase tracking-widest">Peak Load</p>
+                 <p className="text-sm font-black italic">{maxG.toFixed(2)}G</p>
                </div>
                <div className="text-center">
-                 <p className="text-[9px] font-black text-muted-foreground uppercase tracking-widest">Load</p>
-                 <p className="text-sm font-black italic text-accent">{(current.total / 9.81).toFixed(2)}G</p>
+                 <p className="text-[9px] font-black text-muted-foreground uppercase tracking-widest">Status</p>
+                 <p className={cn("text-sm font-black italic", isCrashed ? "text-destructive" : "text-accent")}>
+                    {isCrashed ? "Impact" : "Normal"}
+                 </p>
                </div>
              </div>
           </div>
@@ -252,10 +217,10 @@ export default function AccelerometerPage() {
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         {[
-          { label: "Longitudinal", val: current.x, color: "text-primary", icon: MoveHorizontal },
-          { label: "Lateral", val: current.y, color: "text-accent", icon: ArrowRightLeft },
-          { label: "Vertical", val: current.z, color: "text-chart-1", icon: MoveVertical },
-          { label: "Resultant", val: current.total, color: "text-foreground", icon: Activity }
+          { label: "Longitudinal (m/s²)", val: current.x, color: "text-primary", icon: MoveHorizontal },
+          { label: "Lateral (m/s²)", val: current.y, color: "text-accent", icon: ArrowRightLeft },
+          { label: "Vertical (m/s²)", val: current.z, color: "text-chart-1", icon: MoveVertical },
+          { label: "Resultant (m/s²)", val: current.total, color: "text-foreground", icon: Activity }
         ].map((stat, i) => (
           <Card key={i} className="bg-card border-border/40 overflow-hidden shadow-sm">
             <CardHeader className="pb-1 pt-4 px-4">
