@@ -52,11 +52,16 @@ export default function AccelerometerPage() {
       const ay_ms2 = (Number(val.y) / 16384) * 9.81;
       const az_ms2 = (Number(val.z) / 16384) * 9.81;
 
-      // 2. Compute resultant force magnitude (excluding gravity for pure impact/movement force)
-      // Note: We subtract 9.81 from Z to get vertical acceleration relative to resting
-      const resultant_ms2 = Math.sqrt(ax_ms2 * ax_ms2 + ay_ms2 * ay_ms2 + (az_ms2 - 9.81) * (az_ms2 - 9.81));
+      // 2. Compute motion G-force by isolating total acceleration from gravity (1G)
+      const total_ms2 = Math.sqrt(ax_ms2 * ax_ms2 + ay_ms2 * ay_ms2 + az_ms2 * az_ms2);
+      const totalG = total_ms2 / 9.81;
       
-      const currentG = resultant_ms2 / 9.81;
+      // currentG represents the magnitude of external forces (impact/motion) acting on the vehicle
+      let currentG = Math.abs(totalG - 1.0);
+      
+      // Noise floor: If motion is minimal, force to exactly 0 to prevent jitter/drift
+      if (currentG < 0.15) currentG = 0;
+
       const timeLabel = new Date().toLocaleTimeString([], { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
 
       // 3. Update State
@@ -65,10 +70,10 @@ export default function AccelerometerPage() {
         x: ax_ms2, 
         y: ay_ms2, 
         z: az_ms2, 
-        total: resultant_ms2 
+        total: currentG * 9.81 // Store the motion force in m/s2
       });
       
-      setMaxForceValue(prev => Math.max(prev, resultant_ms2));
+      setMaxForceValue(prev => Math.max(prev, currentG * 9.81));
 
       // ---------------------------------------------------------
       // CRASH DETECTION (G-Force > 2.5g)
