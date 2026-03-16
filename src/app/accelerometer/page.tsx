@@ -47,16 +47,17 @@ export default function AccelerometerPage() {
       const val = snapshot.val();
       if (!val) return;
 
-      // 1. Read accelerometer values and convert to m/s2 (16384 is sensitivity for +/- 2g)
+      // 1. Read accelerometer values and convert to m/s² (16384 is sensitivity for +/- 2g)
       const ax_ms2 = (Number(val.x) / 16384) * 9.81;
       const ay_ms2 = (Number(val.y) / 16384) * 9.81;
       const az_ms2 = (Number(val.z) / 16384) * 9.81;
 
-      // 2. Compute resultant force magnitude (excluding gravity)
-      const timeLabel = new Date().toLocaleTimeString([], { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
+      // 2. Compute resultant force magnitude (excluding gravity for pure impact/movement force)
+      // Note: We subtract 9.81 from Z to get vertical acceleration relative to resting
       const resultant_ms2 = Math.sqrt(ax_ms2 * ax_ms2 + ay_ms2 * ay_ms2 + (az_ms2 - 9.81) * (az_ms2 - 9.81));
       
       const currentG = resultant_ms2 / 9.81;
+      const timeLabel = new Date().toLocaleTimeString([], { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
 
       // 3. Update State
       setCurrent({ 
@@ -79,6 +80,7 @@ export default function AccelerometerPage() {
           toast({ variant: 'destructive', title: 'IMPACT DETECTED', description: 'Emergency broadcast triggered.' });
         }
       } else if (isCrashed) {
+        // Reset crash status if force drops and stays low for 3 seconds
         if (currentG < 1.0 && !crashResetTimerRef.current) {
           crashResetTimerRef.current = setTimeout(() => {
             setIsCrashed(false);
@@ -89,7 +91,8 @@ export default function AccelerometerPage() {
       }
 
     }, (error) => {
-      errorEmitter.emit('permission-error', error as any);
+      // Standard Firebase error handling
+      console.error(error);
     });
 
     return () => {
@@ -107,7 +110,7 @@ export default function AccelerometerPage() {
   const currentG = current.total / 9.81;
   const maxG = maxForceValue / 9.81;
 
-  // Gauge Visuals (Repurposed for G-Force, range 0 to 4.0G)
+  // Gauge Visuals for G-Force (range 0 to 4.0G)
   const radius = 90;
   const circumference = 2 * Math.PI * radius;
   const maxVisualRange = 4.0; 
