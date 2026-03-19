@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Activity, Zap, ArrowRightLeft, MoveVertical, MoveHorizontal, RefreshCcw } from 'lucide-react';
+import { Activity, Zap, ArrowRightLeft, MoveVertical, MoveHorizontal, RefreshCcw, Volume2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useFirebase } from '@/firebase';
 import { ref, onValue, off, set } from 'firebase/database';
@@ -31,6 +31,7 @@ export default function AccelerometerPage() {
   // Persistent physical state refs
   const speedMsRef = useRef<number>(0);
   const crashResetTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const lastVoiceAlertRef = useRef<number>(0);
 
   // Filters to handle gravity/tilt drift
   const baselineX = useRef<number>(0);
@@ -59,7 +60,6 @@ export default function AccelerometerPage() {
       const az = (Number(val.z) / 16384) * 9.81;
 
       // 2. Dynamic Gravity/Tilt baseline (Low Pass Filter)
-      // Tracks the constant force of gravity even if the sensor is tilted
       baselineX.current = (0.9 * baselineX.current) + (0.1 * ax);
       baselineY.current = (0.9 * baselineY.current) + (0.1 * ay);
 
@@ -70,17 +70,16 @@ export default function AccelerometerPage() {
       let horizontal_a = Math.sqrt(dynamicX * dynamicX + dynamicY * dynamicY);
 
       // 4. Noise Gate / Stability Threshold
-      // Only process motion if it exceeds 0.7 m/s² (Bike vibration threshold)
       if (horizontal_a < 0.7) {
         horizontal_a = 0;
       }
 
       // 5. Symmetric Integration/Deceleration
       if (horizontal_a > 0) {
-        // ACCELERATION: Increment speed based on detected force
+        // ACCELERATION logic remains the same
         speedMsRef.current = speedMsRef.current + (horizontal_a * 0.8);
       } else {
-        // DECELERATION: Ultra-aggressive decay (85% reduction per sample) when stable
+        // DECELERATION logic remains the same (aggressive decay)
         speedMsRef.current = speedMsRef.current * 0.15;
       }
 
@@ -91,13 +90,26 @@ export default function AccelerometerPage() {
       // 7. Convert to KM/H
       let currentSpeedKmh = speedMsRef.current * 3.6;
 
-      // 8. Zero-Snap (Immediately kill micro-values for a clean display)
+      // 8. Zero-Snap
       if (currentSpeedKmh < 0.5) {
         currentSpeedKmh = 0;
         speedMsRef.current = 0;
       }
 
-      // 9. Update State
+      // 9. Voice Alert logic for > 90 km/h
+      if (currentSpeedKmh > 90) {
+        const now = Date.now();
+        if (now - lastVoiceAlertRef.current > 5000) { // 5 second cooldown
+          if ('speechSynthesis' in window) {
+            const utterance = new SpeechSynthesisUtterance("Warning: Overspeeding detected!");
+            window.speechSynthesis.speak(utterance);
+          }
+          toast({ variant: 'destructive', title: 'OVERSPEEDING', description: 'Speed exceeds 90 km/h limit!' });
+          lastVoiceAlertRef.current = now;
+        }
+      }
+
+      // 10. Update State
       setSpeedKmh(currentSpeedKmh);
 
       // --- Stats & Crash Detection ---
@@ -123,7 +135,6 @@ export default function AccelerometerPage() {
           toast({ variant: 'destructive', title: 'IMPACT DETECTED', description: 'Broadcasting emergency data.' });
         }
       } else if (isCrashed) {
-        // Auto-clear crash status if stable for 3 seconds
         if (currentG < 0.5 && !crashResetTimerRef.current) {
           crashResetTimerRef.current = setTimeout(() => {
             setIsCrashed(false);
@@ -140,26 +151,20 @@ export default function AccelerometerPage() {
   }, [active, database, isCrashed, toast]);
 
   const resetTelemetry = () => {
-    // Reset ALL internal physical states
     speedMsRef.current = 0;
     baselineX.current = 0;
     baselineY.current = 0;
-    
-    // Reset Component State
     setSpeedKmh(0);
     setMaxForceValue(0);
     setIsCrashed(false);
-    
-    // Reset Database status
     if (database) set(ref(database, 'car_kit/crash_alert'), false);
-    
     toast({ title: 'System Reset', description: 'Speedometer and G-Force peaks cleared.' });
   };
 
   const maxG = maxForceValue / 9.81;
   const radius = 90;
   const circumference = 2 * Math.PI * radius;
-  const maxVisualRange = 60.0; 
+  const maxVisualRange = 120.0; 
   const percentage = Math.min(speedKmh / maxVisualRange, 1);
   const strokeDashoffset = circumference - (percentage * circumference * 0.75); 
 
@@ -201,7 +206,7 @@ export default function AccelerometerPage() {
       <div className="flex justify-center py-8">
         <Card className={cn(
           "w-[340px] h-[340px] md:w-[400px] md:h-[400px] rounded-full bg-card border-[8px] relative flex flex-col items-center justify-center transition-all duration-300 shadow-2xl",
-          isCrashed ? "border-destructive animate-pulse" : "border-muted/50"
+          isCrashed || speedKmh > 90 ? "border-destructive animate-pulse" : "border-muted/50"
         )}>
           <div className="absolute top-12 flex flex-col items-center gap-1 z-20">
             <div className="flex items-center gap-2">
@@ -225,14 +230,14 @@ export default function AccelerometerPage() {
                 fill="none" stroke="currentColor" strokeWidth="12"
                 strokeDasharray={`${circumference * 0.75} ${circumference}`}
                 strokeDashoffset={strokeDashoffset}
-                className={cn("transition-all duration-300 ease-out", isCrashed ? "text-destructive" : "text-primary")}
+                className={cn("transition-all duration-300 ease-out", speedKmh > 90 || isCrashed ? "text-destructive" : "text-primary")}
                 strokeLinecap="round"
               />
             </svg>
 
             <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
               <div className="space-y-0 -mt-4">
-                <span className={cn("text-6xl md:text-7xl font-black tracking-tighter tabular-nums leading-none block", isCrashed && "text-destructive")}>
+                <span className={cn("text-6xl md:text-7xl font-black tracking-tighter tabular-nums leading-none block", (speedKmh > 90 || isCrashed) && "text-destructive")}>
                   {speedKmh.toFixed(1)}
                 </span>
                 <span className="text-lg font-black text-primary italic uppercase tracking-tighter">KM/H</span>
@@ -243,7 +248,7 @@ export default function AccelerometerPage() {
               className="absolute top-1/2 left-1/2 w-1 h-32 -mt-32 -ml-0.5 origin-bottom transition-transform duration-300 ease-out z-30"
               style={{ transform: `translateX(-50%) rotate(${percentage * 270 - 135}deg)` }}
             >
-              <div className={cn("w-full h-full rounded-full shadow-[0_0_10px_rgba(0,0,0,0.5)]", isCrashed ? "bg-destructive" : "bg-accent")} />
+              <div className={cn("w-full h-full rounded-full shadow-[0_0_10px_rgba(0,0,0,0.5)]", speedKmh > 90 || isCrashed ? "bg-destructive" : "bg-accent")} />
             </div>
           </div>
 
@@ -254,13 +259,16 @@ export default function AccelerometerPage() {
                  <p className="text-sm font-black italic">{maxG.toFixed(2)}G</p>
                </div>
                <div className="text-center">
-                 <p className="text-[9px] font-black text-muted-foreground uppercase tracking-widest">Stability</p>
-                 <p className={cn("text-sm font-black italic", isCrashed ? "text-destructive" : "text-accent")}>
-                    {isCrashed ? "Impact" : "High"}
+                 <p className="text-[9px] font-black text-muted-foreground uppercase tracking-widest">Status</p>
+                 <p className={cn("text-sm font-black italic", speedKmh > 90 || isCrashed ? "text-destructive" : "text-accent")}>
+                    {isCrashed ? "Impact" : (speedKmh > 90 ? "Overspeed" : "Normal")}
                  </p>
                </div>
              </div>
           </div>
+          {speedKmh > 90 && (
+            <div className="absolute inset-0 rounded-full border-4 border-destructive/30 animate-ping pointer-events-none" />
+          )}
         </Card>
       </div>
 
