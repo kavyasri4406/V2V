@@ -27,7 +27,7 @@ export default function NotesPage() {
     const isLoading = isUserLoading || areNotesLoading;
 
     return (
-        <div className="w-full max-w-4xl mx-auto">
+        <div className="w-full max-w-4xl mx-auto animate-in fade-in slide-in-from-bottom-2 duration-500">
             <Card>
                 <CardHeader className="flex flex-row items-center justify-between">
                     <div>
@@ -39,7 +39,7 @@ export default function NotesPage() {
                     <NoteFormDialog
                         open={isFormOpen}
                         onOpenChange={setIsFormOpen}
-                        note={null} // Pass null for creating a new note
+                        note={null} 
                     >
                         <Button onClick={() => setIsFormOpen(true)}>
                             <Plus className="mr-2 h-4 w-4" /> Add Note
