@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Compass, RotateCw, AlertTriangle, RefreshCcw, Activity } from 'lucide-react';
+import { Compass, RotateCw, AlertTriangle, Activity } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useFirebase } from '@/firebase';
 import { ref, onValue, off } from 'firebase/database';
@@ -70,7 +70,7 @@ export default function GyroscopePage() {
         const now = Date.now();
         if (now - lastVoiceAlertRef.current > 4000) {
           if ('speechSynthesis' in window) {
-            const utterance = new SpeechSynthesisUtterance("Warning: Excessive lean angle detected.");
+            const utterance = new SpeechSynthesisUtterance("Emergency: Excessive lean angle detected.");
             window.speechSynthesis.speak(utterance);
           }
           toast({
@@ -99,7 +99,7 @@ export default function GyroscopePage() {
         <div>
           <h1 className="text-3xl font-black tracking-tighter uppercase italic flex items-center gap-3 text-foreground">
             <Compass className={cn("h-8 w-8", isTilted ? "text-destructive animate-pulse" : "text-primary")} />
-            Tilt & Lean Monitor
+            Vehicle Tilt
           </h1>
           <p className="text-muted-foreground text-[10px] font-black uppercase tracking-widest opacity-60">
             {isTilted ? "CRITICAL LEAN ANGLE" : "Real-time Vehicle Stability"}

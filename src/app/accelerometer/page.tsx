@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Activity, Zap, ArrowRightLeft, MoveVertical, MoveHorizontal, RefreshCcw, Volume2 } from 'lucide-react';
+import { Activity, Zap, ArrowRightLeft, MoveVertical, MoveHorizontal, RefreshCcw } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useFirebase } from '@/firebase';
 import { ref, onValue, off, set } from 'firebase/database';
@@ -101,7 +101,7 @@ export default function AccelerometerPage() {
         const now = Date.now();
         if (now - lastVoiceAlertRef.current > 5000) { // 5 second cooldown
           if ('speechSynthesis' in window) {
-            const utterance = new SpeechSynthesisUtterance("Warning: Overspeeding detected!");
+            const utterance = new SpeechSynthesisUtterance("Emergency: Overspeeding detected!");
             window.speechSynthesis.speak(utterance);
           }
           toast({ variant: 'destructive', title: 'OVERSPEEDING', description: 'Speed exceeds 90 km/h limit!' });

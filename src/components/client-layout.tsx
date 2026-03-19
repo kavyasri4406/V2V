@@ -42,7 +42,7 @@ const navigationItems = [
     { name: 'Send Alert', href: '/send-alert', icon: Send, auth: true },
     { name: 'Quick Alert', href: '/detailed-alert', icon: MessageSquareWarning, auth: true },
     { name: 'Accelerometer', href: '/accelerometer', icon: Activity, auth: true },
-    { name: 'Tilt Sensor', href: '/gyroscope', icon: Compass, auth: true },
+    { name: 'Vehicle Tilt', href: '/gyroscope', icon: Compass, auth: true },
     { name: 'Nearby Places', href: '/nearby', icon: Navigation, auth: true },
     { name: 'Live Feed', href: '/live-feed', icon: RadioTower, auth: true },
     { name: 'Notes', href: '/notes', icon: NotebookPen, auth: true },
