@@ -13,10 +13,13 @@ import {
   Info,
   RefreshCcw
 } from 'lucide-react';
-import { useFirebase } from '@/firebase';
+import { useFirebase, useFirestore, useUser, useDoc, useMemoFirebase, errorEmitter, FirestorePermissionError } from '@/firebase';
 import { ref, onValue, off } from 'firebase/database';
+import { collection, addDoc, serverTimestamp, doc } from 'firebase/firestore';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
+import { defaultLocation } from '@/lib/location';
+import type { UserProfile } from '@/lib/types';
 
 type EventLog = {
   type: 'Braking' | 'Acceleration' | 'Cornering' | 'Pothole';
@@ -37,8 +40,18 @@ export default function AnalyticsPage() {
   });
 
   const { database } = useFirebase();
+  const firestore = useFirestore();
+  const { user } = useUser();
   const { toast } = useToast();
   const lastEventTime = useRef<number>(0);
+  const lastBroadcastRef = useRef<Record<string, number>>({});
+
+  const userProfileRef = useMemoFirebase(() => {
+    if (!firestore || !user) return null;
+    return doc(firestore, 'users', user.uid);
+  }, [firestore, user]);
+
+  const { data: userProfile } = useDoc<UserProfile>(userProfileRef);
 
   const handleReset = () => {
     setScore(100);
@@ -53,6 +66,36 @@ export default function AnalyticsPage() {
       title: "Insights Reset",
       description: "Safety score and event logs have been cleared.",
     });
+  };
+
+  const broadcastEvent = (event: EventLog) => {
+    if (!firestore || !user || event.severity === 'Low') return;
+    
+    // Cooldown per event type: 60 seconds
+    const now = Date.now();
+    if (now - (lastBroadcastRef.current[event.type] || 0) < 60000) return;
+
+    const alertData = {
+      driver_name: userProfile?.driverName || 'Anonymous',
+      sender_vehicle: userProfile?.vehicleNumber || 'N/A',
+      message: `HAZARD: Harsh ${event.type} detected (${event.severity} Intensity).`,
+      timestamp: serverTimestamp(),
+      userId: user.uid,
+      latitude: defaultLocation.latitude,
+      longitude: defaultLocation.longitude,
+      impactForce: 0,
+    };
+
+    const alertsRef = collection(firestore, 'alerts');
+    addDoc(alertsRef, alertData).catch((e) => {
+      errorEmitter.emit('permission-error', new FirestorePermissionError({
+        path: alertsRef.path,
+        operation: 'create',
+        requestResourceData: alertData,
+      }));
+    });
+    
+    lastBroadcastRef.current[event.type] = now;
   };
 
   useEffect(() => {
@@ -77,7 +120,6 @@ export default function AnalyticsPage() {
 
       let newEvent: EventLog | null = null;
 
-      // 1. Detect Harsh Braking (Sudden negative longitudinal acceleration)
       if (ax < -6.0) {
         newEvent = { 
           type: 'Braking', 
@@ -87,7 +129,6 @@ export default function AnalyticsPage() {
         };
         setStats(prev => ({ ...prev, harshBraking: prev.harshBraking + 1 }));
       } 
-      // 2. Detect Rapid Acceleration
       else if (ax > 5.0) {
         newEvent = { 
           type: 'Acceleration', 
@@ -97,7 +138,6 @@ export default function AnalyticsPage() {
         };
         setStats(prev => ({ ...prev, rapidAccel: prev.rapidAccel + 1 }));
       }
-      // 3. Detect Potholes / Vertical Impact
       else if (Math.abs(az - 9.81) > 8.0) {
         newEvent = { 
           type: 'Pothole', 
@@ -111,12 +151,13 @@ export default function AnalyticsPage() {
       if (newEvent) {
         setEvents(prev => [newEvent!, ...prev].slice(0, 10));
         setScore(prev => Math.max(0, prev - (newEvent!.severity === 'High' ? 5 : 2)));
+        broadcastEvent(newEvent);
         lastEventTime.current = now;
       }
     });
 
     return () => off(sensorRef);
-  }, [active, database]);
+  }, [active, database, userProfile]);
 
   return (
     <div className="w-full max-w-6xl mx-auto space-y-6 pb-12">
@@ -211,12 +252,12 @@ export default function AnalyticsPage() {
           <Card className="bg-destructive/5 border-destructive/20">
             <CardHeader className="pb-2">
               <CardTitle className="text-sm font-black uppercase tracking-widest flex items-center gap-2 text-destructive">
-                <AlertTriangle className="h-4 w-4" /> Active Hazards
+                <AlertTriangle className="h-4 w-4" /> V2V Integration
               </CardTitle>
             </CardHeader>
             <CardContent>
               <p className="text-[10px] leading-tight text-muted-foreground font-medium">
-                Detected events are processed locally. High-severity impacts trigger automatic V2V network alerts.
+                Severe driving violations are automatically broadcasted to the V2V network to alert surrounding drivers of unpredictable behavior.
               </p>
             </CardContent>
           </Card>

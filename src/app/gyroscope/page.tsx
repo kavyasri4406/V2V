@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect, useRef, useCallback } from 'react';
@@ -12,6 +11,7 @@ import { collection, addDoc, serverTimestamp, doc } from 'firebase/firestore';
 import { cn } from '@/lib/utils';
 import { Progress } from '@/components/ui/progress';
 import { defaultLocation } from '@/lib/location';
+import type { UserProfile } from '@/lib/types';
 
 export default function GyroscopePage() {
   const [active, setActive] = useState(false);
@@ -35,14 +35,13 @@ export default function GyroscopePage() {
   const GYRO_SENSITIVITY = 131.0;
   const TILT_THRESHOLD = 35; // Warning threshold
   const FALL_THRESHOLD = 70; // Emergency threshold
-  const FALL_WAIT_TIME = 5000; // 5 seconds
 
   const userProfileRef = useMemoFirebase(() => {
     if (!firestore || !user) return null;
     return doc(firestore, 'users', user.uid);
   }, [firestore, user]);
 
-  const { data: userProfile } = useDoc(userProfileRef);
+  const { data: userProfile } = useDoc<UserProfile>(userProfileRef);
 
   useEffect(() => {
     setIsMounted(true);
@@ -54,7 +53,7 @@ export default function GyroscopePage() {
     const alertData = {
       driver_name: userProfile?.driverName || 'Anonymous',
       sender_vehicle: userProfile?.vehicleNumber || 'N/A',
-      message: "FALL DETECTED: SOS Emergency Alert! Vehicle is down.",
+      message: "FALL DETECTED: Emergency SOS Alert! Vehicle is down.",
       timestamp: serverTimestamp(),
       userId: user.uid,
       latitude: defaultLocation.latitude,
@@ -119,7 +118,6 @@ export default function GyroscopePage() {
       const absRoll = Math.abs(roll);
       const absPitch = Math.abs(pitch);
 
-      // 1. Check for basic tilt warning
       if (absRoll > TILT_THRESHOLD) {
         setIsTilted(true);
         const now = Date.now();
@@ -133,7 +131,6 @@ export default function GyroscopePage() {
         setIsTilted(false);
       }
 
-      // 2. Fall Detection Logic (> 70 degrees)
       if ((absRoll > FALL_THRESHOLD || absPitch > FALL_THRESHOLD) && !isFallDetected) {
         if (!fallTimerRef.current) {
           setFallCountdown(5);
@@ -150,7 +147,6 @@ export default function GyroscopePage() {
           }, 1000);
         }
       } else if (absRoll < 45 && absPitch < 45) {
-        // Recovery or upright
         if (fallTimerRef.current) {
           clearInterval(fallTimerRef.current);
           fallTimerRef.current = null;
@@ -165,7 +161,7 @@ export default function GyroscopePage() {
       off(accelRef);
       if (fallTimerRef.current) clearInterval(fallTimerRef.current);
     };
-  }, [active, database, isFallDetected, triggerSOS]);
+  }, [active, database, isFallDetected, triggerSOS, userProfile]);
 
   const cancelFallAlert = () => {
     if (fallTimerRef.current) {

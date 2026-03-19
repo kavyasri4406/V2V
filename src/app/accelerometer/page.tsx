@@ -5,9 +5,12 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Activity, Zap, ArrowRightLeft, MoveVertical, MoveHorizontal, RefreshCcw } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { useFirebase } from '@/firebase';
+import { useFirebase, useFirestore, useUser, useDoc, useMemoFirebase, errorEmitter, FirestorePermissionError } from '@/firebase';
 import { ref, onValue, off, set } from 'firebase/database';
+import { collection, addDoc, serverTimestamp, doc } from 'firebase/firestore';
 import { cn } from '@/lib/utils';
+import { defaultLocation } from '@/lib/location';
+import type { UserProfile } from '@/lib/types';
 
 type AccelPoint = {
   time: string;
@@ -27,15 +30,25 @@ export default function AccelerometerPage() {
   
   const { toast } = useToast();
   const { database } = useFirebase();
+  const firestore = useFirestore();
+  const { user } = useUser();
   
   // Persistent physical state refs
   const speedMsRef = useRef<number>(0);
   const crashResetTimerRef = useRef<NodeJS.Timeout | null>(null);
   const lastVoiceAlertRef = useRef<number>(0);
+  const lastBroadcastRef = useRef<Record<string, number>>({});
 
   // Filters to handle gravity/tilt drift
   const baselineX = useRef<number>(0);
   const baselineY = useRef<number>(0);
+
+  const userProfileRef = useMemoFirebase(() => {
+    if (!firestore || !user) return null;
+    return doc(firestore, 'users', user.uid);
+  }, [firestore, user]);
+
+  const { data: userProfile } = useDoc<UserProfile>(userProfileRef);
 
   useEffect(() => {
     setIsMounted(true);
@@ -43,6 +56,36 @@ export default function AccelerometerPage() {
       if (crashResetTimerRef.current) clearTimeout(crashResetTimerRef.current);
     };
   }, []);
+
+  const broadcastAlert = (message: string, type: string, force?: number) => {
+    if (!firestore || !user) return;
+    
+    // Cooldown: 30 seconds for same type of auto-alert
+    const now = Date.now();
+    if (now - (lastBroadcastRef.current[type] || 0) < 30000) return;
+
+    const alertData = {
+      driver_name: userProfile?.driverName || 'Anonymous',
+      sender_vehicle: userProfile?.vehicleNumber || 'N/A',
+      message: message,
+      timestamp: serverTimestamp(),
+      userId: user.uid,
+      latitude: defaultLocation.latitude,
+      longitude: defaultLocation.longitude,
+      impactForce: force || 0,
+    };
+
+    const alertsRef = collection(firestore, 'alerts');
+    addDoc(alertsRef, alertData).catch((e) => {
+      errorEmitter.emit('permission-error', new FirestorePermissionError({
+        path: alertsRef.path,
+        operation: 'create',
+        requestResourceData: alertData,
+      }));
+    });
+    
+    lastBroadcastRef.current[type] = now;
+  };
 
   useEffect(() => {
     if (!active || !database) return;
@@ -63,7 +106,7 @@ export default function AccelerometerPage() {
       baselineX.current = (0.9 * baselineX.current) + (0.1 * ax);
       baselineY.current = (0.9 * baselineY.current) + (0.1 * ay);
 
-      // 3. Dynamic Acceleration (Actual motion relative to current orientation)
+      // 3. Dynamic Acceleration
       const dynamicX = ax - baselineX.current;
       const dynamicY = ay - baselineY.current;
       
@@ -76,43 +119,38 @@ export default function AccelerometerPage() {
 
       // 5. Symmetric Integration/Deceleration
       if (horizontal_a > 0) {
-        // ACCELERATION logic remains the same
         speedMsRef.current = speedMsRef.current + (horizontal_a * 0.8);
       } else {
-        // DECELERATION logic remains the same (aggressive decay)
         speedMsRef.current = speedMsRef.current * 0.15;
       }
 
       // 6. Velocity Safety Clamp
       if (speedMsRef.current < 0) speedMsRef.current = 0;
-      if (speedMsRef.current > 33.3) speedMsRef.current = 33.3; // Cap at 120 km/h
+      if (speedMsRef.current > 33.3) speedMsRef.current = 33.3;
 
       // 7. Convert to KM/H
       let currentSpeedKmh = speedMsRef.current * 3.6;
 
-      // 8. Zero-Snap
       if (currentSpeedKmh < 0.5) {
         currentSpeedKmh = 0;
         speedMsRef.current = 0;
       }
 
-      // 9. Voice Alert logic for > 90 km/h
+      // 9. Voice Alert & Broadcast logic for > 90 km/h
       if (currentSpeedKmh > 90) {
         const now = Date.now();
-        if (now - lastVoiceAlertRef.current > 5000) { // 5 second cooldown
+        if (now - lastVoiceAlertRef.current > 5000) {
           if ('speechSynthesis' in window) {
-            const utterance = new SpeechSynthesisUtterance("Emergency: Overspeeding detected!");
-            window.speechSynthesis.speak(utterance);
+            window.speechSynthesis.speak(new SpeechSynthesisUtterance("Emergency: Overspeeding detected!"));
           }
           toast({ variant: 'destructive', title: 'OVERSPEEDING', description: 'Speed exceeds 90 km/h limit!' });
+          broadcastAlert(`CRITICAL: Vehicle ${userProfile?.vehicleNumber || 'N/A'} is overspeeding at ${currentSpeedKmh.toFixed(1)} km/h.`, 'overspeed');
           lastVoiceAlertRef.current = now;
         }
       }
 
-      // 10. Update State
       setSpeedKmh(currentSpeedKmh);
 
-      // --- Stats & Crash Detection ---
       const total_ms2 = Math.sqrt(ax * ax + ay * ay + az * az);
       const currentG = Math.abs((total_ms2 / 9.81) - 1.0);
       
@@ -133,6 +171,7 @@ export default function AccelerometerPage() {
           setIsCrashed(true);
           set(crashAlertRef, true);
           toast({ variant: 'destructive', title: 'IMPACT DETECTED', description: 'Broadcasting emergency data.' });
+          broadcastAlert(`SOS: High Impact Collision detected for vehicle ${userProfile?.vehicleNumber || 'N/A'}.`, 'crash', currentG);
         }
       } else if (isCrashed) {
         if (currentG < 0.5 && !crashResetTimerRef.current) {
@@ -148,7 +187,7 @@ export default function AccelerometerPage() {
     return () => {
       off(sensorRef);
     };
-  }, [active, database, isCrashed, toast]);
+  }, [active, database, isCrashed, toast, userProfile]);
 
   const resetTelemetry = () => {
     speedMsRef.current = 0;

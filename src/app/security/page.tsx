@@ -3,14 +3,15 @@
 import { useState, useEffect, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Switch } from '@/components/ui/switch';
-import { Label } from '@/components/ui/label';
 import { ShieldAlert, ShieldCheck, ShieldOff, Siren, Bell, Settings, Lock, Unlock } from 'lucide-react';
-import { useFirebase } from '@/firebase';
+import { useFirebase, useFirestore, useUser, useDoc, useMemoFirebase, errorEmitter, FirestorePermissionError } from '@/firebase';
 import { ref, onValue, off } from 'firebase/database';
+import { collection, addDoc, serverTimestamp, doc } from 'firebase/firestore';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import { Slider } from '@/components/ui/slider';
+import { defaultLocation } from '@/lib/location';
+import type { UserProfile } from '@/lib/types';
 
 export default function SecurityPage() {
   const [isArmed, setIsArmed] = useState(false);
@@ -19,17 +20,25 @@ export default function SecurityPage() {
   const [lastMotion, setLastMotion] = useState<number>(0);
   
   const { database } = useFirebase();
+  const firestore = useFirestore();
+  const { user } = useUser();
   const { toast } = useToast();
   
   const baselineAccel = useRef<{x: number, y: number, z: number} | null>(null);
   const baselineGyro = useRef<{x: number, y: number, z: number} | null>(null);
+
+  const userProfileRef = useMemoFirebase(() => {
+    if (!firestore || !user) return null;
+    return doc(firestore, 'users', user.uid);
+  }, [firestore, user]);
+
+  const { data: userProfile } = useDoc<UserProfile>(userProfileRef);
 
   // Stop alarm
   const disarmSystem = () => {
     setIsArmed(false);
     setIsAlarmTriggered(false);
     
-    // Stop any ongoing voice alerts immediately
     if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
       window.speechSynthesis.cancel();
     }
@@ -45,17 +54,42 @@ export default function SecurityPage() {
     toast({ title: "System Armed", description: "Vibration and tilt sensors active." });
   };
 
+  const broadcastBreach = () => {
+    if (!firestore || !user) return;
+
+    const alertData = {
+      driver_name: userProfile?.driverName || 'Anonymous',
+      sender_vehicle: userProfile?.vehicleNumber || 'N/A',
+      message: `SECURITY BREACH: Unauthorized movement detected for vehicle ${userProfile?.vehicleNumber || 'N/A'}.`,
+      timestamp: serverTimestamp(),
+      userId: user.uid,
+      latitude: defaultLocation.latitude,
+      longitude: defaultLocation.longitude,
+      impactForce: 0,
+    };
+
+    const alertsRef = collection(firestore, 'alerts');
+    addDoc(alertsRef, alertData).catch((e) => {
+      errorEmitter.emit('permission-error', new FirestorePermissionError({
+        path: alertsRef.path,
+        operation: 'create',
+        requestResourceData: alertData,
+      }));
+    });
+  };
+
   const triggerAlarm = () => {
     if (isAlarmTriggered) return;
     setIsAlarmTriggered(true);
     
-    // Voice alert - play once
     if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
       const utterance = new SpeechSynthesisUtterance("EMERGENCY: SECURITY BREACH DETECTED. UNAUTHORIZED MOVEMENT.");
       utterance.rate = 1.2;
       utterance.pitch = 1.1;
       window.speechSynthesis.speak(utterance);
     }
+
+    broadcastBreach();
   };
 
   useEffect(() => {
@@ -75,15 +109,13 @@ export default function SecurityPage() {
         return;
       }
 
-      // Calculate vibration magnitude delta
       const deltaX = Math.abs(current.x - baselineAccel.current.x);
       const deltaY = Math.abs(current.y - baselineAccel.current.y);
       const deltaZ = Math.abs(current.z - baselineAccel.current.z);
       
-      const vibration = (deltaX + deltaY + deltaZ) / 32768; // Normalized vibration
+      const vibration = (deltaX + deltaY + deltaZ) / 32768; 
       setLastMotion(vibration);
 
-      // sensitivity threshold: lower value = more sensitive
       if (vibration > (1.1 - sensitivity) * 0.1) {
         triggerAlarm();
       }
@@ -103,7 +135,6 @@ export default function SecurityPage() {
       const deltaTilt = Math.abs(current.x - baselineGyro.current.x) + 
                         Math.abs(current.y - baselineGyro.current.y);
 
-      // Normalized tilt change threshold
       if (deltaTilt / 131.0 > 15 * sensitivity) {
         triggerAlarm();
       }
@@ -113,7 +144,7 @@ export default function SecurityPage() {
       off(accelRef);
       off(gyroRef);
     };
-  }, [isArmed, database, isAlarmTriggered, sensitivity]);
+  }, [isArmed, database, isAlarmTriggered, sensitivity, userProfile]);
 
   return (
     <div className={cn(
@@ -235,13 +266,12 @@ export default function SecurityPage() {
               <div className="p-4 rounded-lg bg-muted/30 space-y-3">
                 <div className="flex items-center gap-3">
                   <Bell className="h-4 w-4 text-accent" />
-                  <span className="text-xs font-bold uppercase tracking-widest">Armed Indicators</span>
+                  <span className="text-xs font-bold uppercase tracking-widest">V2V Emergency Feed</span>
                 </div>
                 <ul className="text-[10px] space-y-2 text-muted-foreground font-medium list-disc pl-4">
-                  <li>Loud vocal siren on movement detection</li>
-                  <li>Visual high-intensity flashing interface</li>
-                  <li>Tilt sensor compensation for parking on slopes</li>
-                  <li>Automatic baseline calibration on arming</li>
+                  <li>Triggers local vocal siren and flashes interface</li>
+                  <li>Automatically broadcasts a Security Breach alert to the V2V network</li>
+                  <li>Allows other drivers to be aware of vehicle tampering in the vicinity</li>
                 </ul>
               </div>
             </CardContent>
