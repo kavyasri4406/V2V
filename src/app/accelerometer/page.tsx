@@ -30,7 +30,6 @@ export default function AccelerometerPage() {
   
   // Persistent physical state refs
   const speedMsRef = useRef<number>(0);
-  const lastSpeedKmhRef = useRef<number>(0);
   const crashResetTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   // Filters to handle gravity/tilt drift
@@ -59,28 +58,29 @@ export default function AccelerometerPage() {
       const ay = (Number(val.y) / 16384) * 9.81;
       const az = (Number(val.z) / 16384) * 9.81;
 
-      // 2. Dynamic Gravity/Tilt baseline (LPF)
-      // This subtracts the constant force of gravity if the sensor is tilted
+      // 2. Dynamic Gravity/Tilt baseline (Low Pass Filter)
+      // Tracks the constant force of gravity even if the sensor is tilted
       baselineX.current = (0.9 * baselineX.current) + (0.1 * ax);
       baselineY.current = (0.9 * baselineY.current) + (0.1 * ay);
 
-      // 3. Dynamic Acceleration (Actual user motion)
+      // 3. Dynamic Acceleration (Actual motion relative to current orientation)
       const dynamicX = ax - baselineX.current;
       const dynamicY = ay - baselineY.current;
       
       let horizontal_a = Math.sqrt(dynamicX * dynamicX + dynamicY * dynamicY);
 
-      // 4. Noise Gate (Stability Threshold)
+      // 4. Noise Gate / Stability Threshold
+      // Only process motion if it exceeds 0.7 m/s² (Bike vibration threshold)
       if (horizontal_a < 0.7) {
         horizontal_a = 0;
       }
 
       // 5. Symmetric Integration/Deceleration
       if (horizontal_a > 0) {
-        // Gain: Increment speed based on force
+        // ACCELERATION: Increment speed based on detected force
         speedMsRef.current = speedMsRef.current + (horizontal_a * 0.8);
       } else {
-        // ULTRA AGGRESSIVE DECAY: Reduce speed by 85% per sample if sensor is stable
+        // DECELERATION: Ultra-aggressive decay (85% reduction per sample) when stable
         speedMsRef.current = speedMsRef.current * 0.15;
       }
 
@@ -91,7 +91,7 @@ export default function AccelerometerPage() {
       // 7. Convert to KM/H
       let currentSpeedKmh = speedMsRef.current * 3.6;
 
-      // 8. Zero-Snap (Instantly kill micro-values)
+      // 8. Zero-Snap (Immediately kill micro-values for a clean display)
       if (currentSpeedKmh < 0.5) {
         currentSpeedKmh = 0;
         speedMsRef.current = 0;
@@ -100,7 +100,7 @@ export default function AccelerometerPage() {
       // 9. Update State
       setSpeedKmh(currentSpeedKmh);
 
-      // --- General Statistics ---
+      // --- Stats & Crash Detection ---
       const total_ms2 = Math.sqrt(ax * ax + ay * ay + az * az);
       const currentG = Math.abs((total_ms2 / 9.81) - 1.0);
       
@@ -140,21 +140,20 @@ export default function AccelerometerPage() {
   }, [active, database, isCrashed, toast]);
 
   const resetTelemetry = () => {
-    // Reset ALL physical states
+    // Reset ALL internal physical states
     speedMsRef.current = 0;
-    lastSpeedKmhRef.current = 0;
     baselineX.current = 0;
     baselineY.current = 0;
     
-    // Reset State
+    // Reset Component State
     setSpeedKmh(0);
     setMaxForceValue(0);
     setIsCrashed(false);
     
-    // Reset Database
+    // Reset Database status
     if (database) set(ref(database, 'car_kit/crash_alert'), false);
     
-    toast({ title: 'System Reset', description: 'Velocity and G-Force peaks cleared.' });
+    toast({ title: 'System Reset', description: 'Speedometer and G-Force peaks cleared.' });
   };
 
   const maxG = maxForceValue / 9.81;
