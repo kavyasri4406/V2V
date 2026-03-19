@@ -1,13 +1,17 @@
+
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { useState, useEffect, useRef, useCallback } from 'react';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Compass, RotateCw, AlertTriangle, Activity } from 'lucide-react';
+import { Compass, RotateCw, AlertTriangle, Activity, Siren, X } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { useFirebase } from '@/firebase';
+import { useFirebase, useFirestore, useUser, useDoc, useMemoFirebase, errorEmitter, FirestorePermissionError } from '@/firebase';
 import { ref, onValue, off } from 'firebase/database';
+import { collection, addDoc, serverTimestamp, doc } from 'firebase/firestore';
 import { cn } from '@/lib/utils';
+import { Progress } from '@/components/ui/progress';
+import { defaultLocation } from '@/lib/location';
 
 export default function GyroscopePage() {
   const [active, setActive] = useState(false);
@@ -16,25 +20,76 @@ export default function GyroscopePage() {
   const [leanAngle, setLeanAngle] = useState({ roll: 0, pitch: 0 });
   const [isTilted, setIsTilted] = useState(false);
   
+  // Fall Detection State
+  const [fallCountdown, setFallCountdown] = useState<number | null>(null);
+  const [isFallDetected, setIsFallDetected] = useState(false);
+  const fallTimerRef = useRef<NodeJS.Timeout | null>(null);
+
   const { toast } = useToast();
   const { database } = useFirebase();
+  const firestore = useFirestore();
+  const { user } = useUser();
   const lastVoiceAlertRef = useRef<number>(0);
 
-  // Constants for MPU6050 sensitivity (assuming 131 LSB / deg/s)
+  // Constants
   const GYRO_SENSITIVITY = 131.0;
-  const TILT_THRESHOLD = 35; // Degrees
+  const TILT_THRESHOLD = 35; // Warning threshold
+  const FALL_THRESHOLD = 70; // Emergency threshold
+  const FALL_WAIT_TIME = 5000; // 5 seconds
+
+  const userProfileRef = useMemoFirebase(() => {
+    if (!firestore || !user) return null;
+    return doc(firestore, 'users', user.uid);
+  }, [firestore, user]);
+
+  const { data: userProfile } = useDoc(userProfileRef);
 
   useEffect(() => {
     setIsMounted(true);
   }, []);
 
+  const triggerSOS = useCallback(async () => {
+    if (!firestore || !user) return;
+
+    const alertData = {
+      driver_name: userProfile?.driverName || 'Anonymous',
+      sender_vehicle: userProfile?.vehicleNumber || 'N/A',
+      message: "FALL DETECTED: SOS Emergency Alert! Vehicle is down.",
+      timestamp: serverTimestamp(),
+      userId: user.uid,
+      latitude: defaultLocation.latitude,
+      longitude: defaultLocation.longitude,
+      impactForce: 0,
+    };
+
+    const alertsRef = collection(firestore, 'alerts');
+    addDoc(alertsRef, alertData)
+      .then(() => {
+        toast({
+          variant: 'destructive',
+          title: 'SOS SENT',
+          description: 'Emergency broadcast sent to nearby vehicles.',
+        });
+        if ('speechSynthesis' in window) {
+          window.speechSynthesis.speak(new SpeechSynthesisUtterance("Emergency: SOS Broadcasted. Help is on the way."));
+        }
+      })
+      .catch((e) => {
+        errorEmitter.emit('permission-error', new FirestorePermissionError({
+          path: alertsRef.path,
+          operation: 'create',
+          requestResourceData: alertData,
+        }));
+      });
+    
+    setIsFallDetected(true);
+    setFallCountdown(null);
+  }, [firestore, user, userProfile, toast]);
+
   useEffect(() => {
     if (!active || !database) return;
 
-    // We monitor the gyroscope data
     const gyroRef = ref(database, 'car_kit/mpu6050_raw/gyroscope');
-    
-    // We also monitor the accelerometer to derive the absolute tilt angle (Roll/Pitch)
     const accelRef = ref(database, 'car_kit/mpu6050_raw/accelerometer');
 
     const unsubscribeGyro = onValue(gyroRef, (snapshot) => {
@@ -52,44 +107,75 @@ export default function GyroscopePage() {
       const val = snapshot.val();
       if (!val) return;
 
-      // Calculate tilt angles using basic trigonometry on accelerometer data
       const ax = Number(val.x);
       const ay = Number(val.y);
       const az = Number(val.z);
 
-      // Simple Roll/Pitch calculation (in degrees)
       const roll = Math.atan2(ay, az) * (180 / Math.PI);
       const pitch = Math.atan2(-ax, Math.sqrt(ay * ay + az * az)) * (180 / Math.PI);
 
       setLeanAngle({ roll, pitch });
 
-      // Check for excessive tilt
       const absRoll = Math.abs(roll);
+      const absPitch = Math.abs(pitch);
+
+      // 1. Check for basic tilt warning
       if (absRoll > TILT_THRESHOLD) {
         setIsTilted(true);
         const now = Date.now();
-        if (now - lastVoiceAlertRef.current > 4000) {
+        if (now - lastVoiceAlertRef.current > 6000) {
           if ('speechSynthesis' in window) {
-            const utterance = new SpeechSynthesisUtterance("Emergency: Excessive lean angle detected.");
-            window.speechSynthesis.speak(utterance);
+            window.speechSynthesis.speak(new SpeechSynthesisUtterance("Emergency: Excessive lean angle detected."));
           }
-          toast({
-            variant: 'destructive',
-            title: 'TILT WARNING',
-            description: `Vehicle lean angle: ${absRoll.toFixed(1)}° exceeds safety limit!`,
-          });
           lastVoiceAlertRef.current = now;
         }
       } else {
         setIsTilted(false);
+      }
+
+      // 2. Fall Detection Logic (> 70 degrees)
+      if ((absRoll > FALL_THRESHOLD || absPitch > FALL_THRESHOLD) && !isFallDetected) {
+        if (!fallTimerRef.current) {
+          setFallCountdown(5);
+          fallTimerRef.current = setInterval(() => {
+            setFallCountdown((prev) => {
+              if (prev !== null && prev <= 1) {
+                clearInterval(fallTimerRef.current!);
+                fallTimerRef.current = null;
+                triggerSOS();
+                return 0;
+              }
+              return prev !== null ? prev - 1 : null;
+            });
+          }, 1000);
+        }
+      } else if (absRoll < 45 && absPitch < 45) {
+        // Recovery or upright
+        if (fallTimerRef.current) {
+          clearInterval(fallTimerRef.current);
+          fallTimerRef.current = null;
+          setFallCountdown(null);
+        }
+        setIsFallDetected(false);
       }
     });
 
     return () => {
       off(gyroRef);
       off(accelRef);
+      if (fallTimerRef.current) clearInterval(fallTimerRef.current);
     };
-  }, [active, database, toast]);
+  }, [active, database, isFallDetected, triggerSOS]);
+
+  const cancelFallAlert = () => {
+    if (fallTimerRef.current) {
+      clearInterval(fallTimerRef.current);
+      fallTimerRef.current = null;
+    }
+    setFallCountdown(null);
+    setIsFallDetected(false);
+    toast({ title: 'Alert Cancelled', description: 'Emergency broadcast aborted.' });
+  };
 
   if (!isMounted) return null;
 
@@ -98,11 +184,11 @@ export default function GyroscopePage() {
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
         <div>
           <h1 className="text-3xl font-black tracking-tighter uppercase italic flex items-center gap-3 text-foreground">
-            <Compass className={cn("h-8 w-8", isTilted ? "text-destructive animate-pulse" : "text-primary")} />
+            <Compass className={cn("h-8 w-8", isTilted || isFallDetected ? "text-destructive animate-pulse" : "text-primary")} />
             Vehicle Tilt
           </h1>
           <p className="text-muted-foreground text-[10px] font-black uppercase tracking-widest opacity-60">
-            {isTilted ? "CRITICAL LEAN ANGLE" : "Real-time Vehicle Stability"}
+            {isFallDetected ? "FALL DETECTED" : isTilted ? "CRITICAL LEAN ANGLE" : "Real-time Vehicle Stability"}
           </p>
         </div>
         <div className="flex items-center gap-3 w-full md:w-auto">
@@ -118,10 +204,40 @@ export default function GyroscopePage() {
         </div>
       </div>
 
+      {fallCountdown !== null && (
+        <Card className="bg-destructive text-destructive-foreground border-4 border-white animate-pulse shadow-2xl">
+          <CardContent className="pt-6">
+            <div className="flex flex-col md:flex-row items-center justify-between gap-6">
+              <div className="flex items-center gap-4">
+                <Siren className="h-12 w-12 animate-bounce" />
+                <div>
+                  <h2 className="text-2xl font-black uppercase italic tracking-tighter leading-tight">Emergency: Tip-Over Detected</h2>
+                  <p className="text-sm font-bold opacity-90 uppercase tracking-widest">SOS Alert broadcasting in {fallCountdown} seconds...</p>
+                </div>
+              </div>
+              <Button size="lg" variant="secondary" onClick={cancelFallAlert} className="w-full md:w-auto font-black uppercase tracking-widest">
+                <X className="mr-2" /> Cancel Broadcast
+              </Button>
+            </div>
+            <Progress value={(5 - fallCountdown) * 20} className="h-2 mt-4 bg-white/20" />
+          </CardContent>
+        </Card>
+      )}
+
+      {isFallDetected && (
+        <Card className="bg-destructive text-white border-none shadow-2xl">
+          <CardContent className="flex flex-col items-center justify-center py-8 text-center space-y-2">
+            <Siren className="h-16 w-16 animate-ping" />
+            <h2 className="text-3xl font-black uppercase italic tracking-tighter">SOS BROADCASTING</h2>
+            <p className="text-sm font-bold uppercase tracking-widest opacity-80">Manual recovery or system reset required to clear status.</p>
+          </CardContent>
+        </Card>
+      )}
+
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         <Card className={cn(
           "relative flex flex-col items-center justify-center p-12 overflow-hidden transition-all duration-300",
-          isTilted ? "bg-destructive/10 border-destructive" : "bg-card border-border/50"
+          isTilted || isFallDetected ? "bg-destructive/10 border-destructive" : "bg-card border-border/50"
         )}>
           <CardHeader className="text-center">
             <CardTitle className="text-sm font-black uppercase tracking-widest">Lean Angle (Roll)</CardTitle>
@@ -138,15 +254,16 @@ export default function GyroscopePage() {
             <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
               <span className={cn(
                 "text-6xl font-black tabular-nums tracking-tighter",
-                isTilted ? "text-destructive" : "text-foreground"
+                isTilted || isFallDetected ? "text-destructive" : "text-foreground"
               )}>
                 {Math.abs(leanAngle.roll).toFixed(1)}°
               </span>
             </div>
           </div>
-          {isTilted && (
+          {(isTilted || isFallDetected) && (
             <div className="mt-4 flex items-center gap-2 text-destructive font-black animate-bounce uppercase text-xs">
-              <AlertTriangle className="h-4 w-4" /> Reduce Lean Angle
+              <AlertTriangle className="h-4 w-4" /> 
+              {Math.abs(leanAngle.roll) > FALL_THRESHOLD ? "VEHICLE DOWN" : "Reduce Lean Angle"}
             </div>
           )}
         </Card>
