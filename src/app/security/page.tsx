@@ -23,16 +23,17 @@ export default function SecurityPage() {
   
   const baselineAccel = useRef<{x: number, y: number, z: number} | null>(null);
   const baselineGyro = useRef<{x: number, y: number, z: number} | null>(null);
-  const alarmVoiceTimer = useRef<NodeJS.Timeout | null>(null);
 
   // Stop alarm
   const disarmSystem = () => {
     setIsArmed(false);
     setIsAlarmTriggered(false);
-    if (alarmVoiceTimer.current) {
-      clearInterval(alarmVoiceTimer.current);
-      alarmVoiceTimer.current = null;
+    
+    // Stop any ongoing voice alerts immediately
+    if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+      window.speechSynthesis.cancel();
     }
+    
     toast({ title: "System Disarmed", description: "Security monitoring deactivated." });
   };
 
@@ -48,18 +49,13 @@ export default function SecurityPage() {
     if (isAlarmTriggered) return;
     setIsAlarmTriggered(true);
     
-    // Voice alert loop
-    const speak = () => {
-      if ('speechSynthesis' in window) {
-        const utterance = new SpeechSynthesisUtterance("EMERGENCY: SECURITY BREACH DETECTED. UNAUTHORIZED MOVEMENT.");
-        utterance.rate = 1.2;
-        utterance.pitch = 1.1;
-        window.speechSynthesis.speak(utterance);
-      }
-    };
-
-    speak();
-    alarmVoiceTimer.current = setInterval(speak, 5000);
+    // Voice alert - play once
+    if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+      const utterance = new SpeechSynthesisUtterance("EMERGENCY: SECURITY BREACH DETECTED. UNAUTHORIZED MOVEMENT.");
+      utterance.rate = 1.2;
+      utterance.pitch = 1.1;
+      window.speechSynthesis.speak(utterance);
+    }
   };
 
   useEffect(() => {
@@ -188,7 +184,7 @@ export default function SecurityPage() {
                 className="w-full font-black uppercase tracking-[0.2em] py-8 text-xl"
                 onClick={armSystem}
               >
-                <ShieldCheck className="mr-2 h-6 w-6" /> ARM PARKED MODE
+                <ShieldCheck className="mr-2 h-6 w-6" /> ARM SECURITY
               </Button>
             )}
 
