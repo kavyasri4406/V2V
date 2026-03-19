@@ -33,6 +33,7 @@ import {
     Activity,
     Compass,
     TrendingUp,
+    ShieldAlert,
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { signOut } from 'firebase/auth';
@@ -45,6 +46,7 @@ const navigationItems = [
     { name: 'Accelerometer', href: '/accelerometer', icon: Activity, auth: true },
     { name: 'Vehicle Tilt', href: '/gyroscope', icon: Compass, auth: true },
     { name: 'Driving Insights', href: '/analytics', icon: TrendingUp, auth: true },
+    { name: 'Security', href: '/security', icon: ShieldAlert, auth: true },
     { name: 'Nearby Places', href: '/nearby', icon: Navigation, auth: true },
     { name: 'Live Feed', href: '/live-feed', icon: RadioTower, auth: true },
     { name: 'Notes', href: '/notes', icon: NotebookPen, auth: true },
