@@ -33,6 +33,10 @@ export default function AccelerometerPage() {
   const lastSpeedKmhRef = useRef<number>(0);
   const crashResetTimerRef = useRef<NodeJS.Timeout | null>(null);
 
+  // Filters to handle gravity/tilt drift
+  const baselineX = useRef<number>(0);
+  const baselineY = useRef<number>(0);
+
   useEffect(() => {
     setIsMounted(true);
     return () => {
@@ -50,67 +54,73 @@ export default function AccelerometerPage() {
       const val = snapshot.val();
       if (!val) return;
 
-      // 1. Read accelerometer values and convert to m/s² (16384 sensitivity for +/- 2g)
-      const ax_ms2 = (Number(val.x) / 16384) * 9.81;
-      const ay_ms2 = (Number(val.y) / 16384) * 9.81;
-      const az_ms2 = (Number(val.z) / 16384) * 9.81;
+      // 1. Convert raw values to m/s²
+      const ax = (Number(val.x) / 16384) * 9.81;
+      const ay = (Number(val.y) / 16384) * 9.81;
+      const az = (Number(val.z) / 16384) * 9.81;
 
-      // 2. Compute motion G-force by isolating total acceleration from gravity (1G)
-      const total_ms2 = Math.sqrt(ax_ms2 * ax_ms2 + ay_ms2 * ay_ms2 + az_ms2 * az_ms2);
-      const totalG = total_ms2 / 9.81;
-      let currentG = Math.abs(totalG - 1.0);
-      if (currentG < 0.15) currentG = 0;
+      // 2. Track baseline (Gravity/Tilt) using a very slow LPF
+      // This ensures that "stable" acceleration (like tilt) is subtracted out
+      baselineX.current = (0.95 * baselineX.current) + (0.05 * ax);
+      baselineY.current = (0.95 * baselineY.current) + (0.05 * ay);
 
-      // 3. BIKE SPEEDOMETER LOGIC
-      // Compute horizontal acceleration magnitude
-      let horizontal_a = Math.sqrt(ax_ms2 * ax_ms2 + ay_ms2 * ay_ms2);
+      // 3. Dynamic Acceleration (Actual motion)
+      const dynamicX = ax - baselineX.current;
+      const dynamicY = ay - baselineY.current;
       
-      // Strong noise dead-zone
+      let horizontal_a = Math.sqrt(dynamicX * dynamicX + dynamicY * dynamicY);
+
+      // 4. Noise Dead-zone (User requested 0.7)
       if (horizontal_a < 0.7) {
         horizontal_a = 0;
       }
 
-      // Movement detection and integration (assuming deltaTime = 1s per sample)
+      // 5. Movement integration
       if (horizontal_a > 0) {
+        // Real movement detected
         speedMsRef.current = speedMsRef.current + (horizontal_a * 1);
       } else {
-        // No movement -> reduce speed gradually (aggressive decay)
-        speedMsRef.current = speedMsRef.current * 0.80;
+        // No movement -> Decelerate FAST (Aggressive 50% decay)
+        speedMsRef.current = speedMsRef.current * 0.50;
       }
 
-      // Convert to km/h
+      // 6. Convert to KM/H
       let currentSpeedKmh = speedMsRef.current * 3.6;
 
-      // Smooth output (0.75 weight on previous)
+      // 7. Smooth output (User requested 0.75 weight)
       currentSpeedKmh = (0.75 * lastSpeedKmhRef.current) + (0.25 * currentSpeedKmh);
 
-      // Force zero when nearly stopped
-      if (currentSpeedKmh < 1.0) {
+      // 8. Force zero when nearly stopped (Zero-Snap)
+      if (currentSpeedKmh < 0.8) {
         currentSpeedKmh = 0;
         speedMsRef.current = 0;
       }
 
-      // Safety clamp (max 10km/h increase per sample to prevent jumps)
+      // 9. Safety clamp (+10 km/h per sample max)
       if (currentSpeedKmh > lastSpeedKmhRef.current + 10) {
         currentSpeedKmh = lastSpeedKmhRef.current + 10;
       }
 
+      // Update state
       lastSpeedKmhRef.current = currentSpeedKmh;
       setSpeedKmh(currentSpeedKmh);
 
-      // 4. Update General Stats
+      // General Stats
+      const total_ms2 = Math.sqrt(ax * ax + ay * ay + az * az);
+      const currentG = Math.abs((total_ms2 / 9.81) - 1.0);
+      
       const timeLabel = new Date().toLocaleTimeString([], { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
       setCurrent({ 
         time: timeLabel, 
-        x: ax_ms2, 
-        y: ay_ms2, 
-        z: az_ms2, 
-        total: currentG * 9.81 
+        x: ax, 
+        y: ay, 
+        z: az, 
+        total: total_ms2
       });
       
-      setMaxForceValue(prev => Math.max(prev, currentG * 9.81));
+      setMaxForceValue(prev => Math.max(prev, total_ms2));
 
-      // 5. CRASH DETECTION (G-Force > 2.5g)
+      // Impact Detection (2.5G)
       if (currentG >= 2.5) {
         if (!isCrashed) {
           setIsCrashed(true);
@@ -126,7 +136,6 @@ export default function AccelerometerPage() {
           }, 3000);
         }
       }
-
     });
 
     return () => {
@@ -135,18 +144,18 @@ export default function AccelerometerPage() {
   }, [active, database, isCrashed, toast]);
 
   const resetTelemetry = () => {
-    setMaxForceValue(0);
-    setSpeedKmh(0);
     speedMsRef.current = 0;
     lastSpeedKmhRef.current = 0;
+    setSpeedKmh(0);
+    setMaxForceValue(0);
     setIsCrashed(false);
+    baselineX.current = 0;
+    baselineY.current = 0;
     if (database) set(ref(database, 'car_kit/crash_alert'), false);
-    toast({ title: 'Telemetry Reset', description: 'Speed and peak load cleared.' });
+    toast({ title: 'Telemetry Reset', description: 'Velocity and peaks cleared.' });
   };
 
   const maxG = maxForceValue / 9.81;
-
-  // Gauge Visuals (KM/H range 0 to 60)
   const radius = 90;
   const circumference = 2 * Math.PI * radius;
   const maxVisualRange = 60.0; 
@@ -259,7 +268,7 @@ export default function AccelerometerPage() {
           { label: "Longitudinal (m/s²)", val: current.x, color: "text-primary", icon: MoveHorizontal },
           { label: "Lateral (m/s²)", val: current.y, color: "text-accent", icon: ArrowRightLeft },
           { label: "Vertical (m/s²)", val: current.z, color: "text-chart-1", icon: MoveVertical },
-          { label: "Current G-Force", val: current.total / 9.81, color: "text-foreground", icon: Activity }
+          { label: "Current Load", val: current.total / 9.81, color: "text-foreground", icon: Activity }
         ].map((stat, i) => (
           <Card key={i} className="bg-card border-border/40 overflow-hidden shadow-sm">
             <CardHeader className="pb-1 pt-4 px-4">
