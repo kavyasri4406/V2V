@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Activity, Zap, ArrowRightLeft, MoveVertical, MoveHorizontal, RefreshCcw } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { useFirebase, errorEmitter } from '@/firebase';
+import { useFirebase } from '@/firebase';
 import { ref, onValue, off, set } from 'firebase/database';
 import { cn } from '@/lib/utils';
 
@@ -23,11 +23,14 @@ export default function AccelerometerPage() {
   const [isMounted, setIsMounted] = useState(false);
   const [current, setCurrent] = useState<AccelPoint>({ time: '', x: 0, y: 0, z: 0, total: 0 });
   const [maxForceValue, setMaxForceValue] = useState(0);
+  const [speedKmh, setSpeedKmh] = useState(0);
   const [isCrashed, setIsCrashed] = useState(false);
   
   const { toast } = useToast();
   const { database } = useFirebase();
   
+  const speedMsRef = useRef<number>(0);
+  const lastSpeedKmhRef = useRef<number>(0);
   const crashResetTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
@@ -47,7 +50,7 @@ export default function AccelerometerPage() {
       const val = snapshot.val();
       if (!val) return;
 
-      // 1. Read accelerometer values and convert to m/s² (16384 is sensitivity for +/- 2g)
+      // 1. Read accelerometer values and convert to m/s² (16384 sensitivity for +/- 2g)
       const ax_ms2 = (Number(val.x) / 16384) * 9.81;
       const ay_ms2 = (Number(val.y) / 16384) * 9.81;
       const az_ms2 = (Number(val.z) / 16384) * 9.81;
@@ -55,29 +58,59 @@ export default function AccelerometerPage() {
       // 2. Compute motion G-force by isolating total acceleration from gravity (1G)
       const total_ms2 = Math.sqrt(ax_ms2 * ax_ms2 + ay_ms2 * ay_ms2 + az_ms2 * az_ms2);
       const totalG = total_ms2 / 9.81;
-      
-      // currentG represents the magnitude of external forces (impact/motion) acting on the vehicle
       let currentG = Math.abs(totalG - 1.0);
-      
-      // Noise floor: If motion is minimal, force to exactly 0 to prevent jitter/drift
       if (currentG < 0.15) currentG = 0;
 
-      const timeLabel = new Date().toLocaleTimeString([], { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
+      // 3. BIKE SPEEDOMETER LOGIC
+      // Compute horizontal acceleration magnitude
+      let horizontal_a = Math.sqrt(ax_ms2 * ax_ms2 + ay_ms2 * ay_ms2);
+      
+      // Strong noise dead-zone
+      if (horizontal_a < 0.7) {
+        horizontal_a = 0;
+      }
 
-      // 3. Update State
+      // Movement detection and integration (assuming deltaTime = 1s per sample)
+      if (horizontal_a > 0) {
+        speedMsRef.current = speedMsRef.current + (horizontal_a * 1);
+      } else {
+        // No movement -> reduce speed gradually (aggressive decay)
+        speedMsRef.current = speedMsRef.current * 0.80;
+      }
+
+      // Convert to km/h
+      let currentSpeedKmh = speedMsRef.current * 3.6;
+
+      // Smooth output (0.75 weight on previous)
+      currentSpeedKmh = (0.75 * lastSpeedKmhRef.current) + (0.25 * currentSpeedKmh);
+
+      // Force zero when nearly stopped
+      if (currentSpeedKmh < 1.0) {
+        currentSpeedKmh = 0;
+        speedMsRef.current = 0;
+      }
+
+      // Safety clamp (max 10km/h increase per sample to prevent jumps)
+      if (currentSpeedKmh > lastSpeedKmhRef.current + 10) {
+        currentSpeedKmh = lastSpeedKmhRef.current + 10;
+      }
+
+      lastSpeedKmhRef.current = currentSpeedKmh;
+      setSpeedKmh(currentSpeedKmh);
+
+      // 4. Update General Stats
+      const timeLabel = new Date().toLocaleTimeString([], { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
       setCurrent({ 
         time: timeLabel, 
         x: ax_ms2, 
         y: ay_ms2, 
         z: az_ms2, 
-        total: currentG * 9.81 // Store the motion force in m/s2
+        total: currentG * 9.81 
       });
       
       setMaxForceValue(prev => Math.max(prev, currentG * 9.81));
 
-      // ---------------------------------------------------------
-      // CRASH DETECTION (G-Force > 2.5g)
-      // ---------------------------------------------------------
+      // 5. CRASH DETECTION (G-Force > 2.5g)
       if (currentG >= 2.5) {
         if (!isCrashed) {
           setIsCrashed(true);
@@ -85,7 +118,6 @@ export default function AccelerometerPage() {
           toast({ variant: 'destructive', title: 'IMPACT DETECTED', description: 'Emergency broadcast triggered.' });
         }
       } else if (isCrashed) {
-        // Reset crash status if force drops and stays low for 3 seconds
         if (currentG < 1.0 && !crashResetTimerRef.current) {
           crashResetTimerRef.current = setTimeout(() => {
             setIsCrashed(false);
@@ -95,9 +127,6 @@ export default function AccelerometerPage() {
         }
       }
 
-    }, (error) => {
-      // Standard Firebase error handling
-      console.error(error);
     });
 
     return () => {
@@ -107,19 +136,21 @@ export default function AccelerometerPage() {
 
   const resetTelemetry = () => {
     setMaxForceValue(0);
+    setSpeedKmh(0);
+    speedMsRef.current = 0;
+    lastSpeedKmhRef.current = 0;
     setIsCrashed(false);
     if (database) set(ref(database, 'car_kit/crash_alert'), false);
-    toast({ title: 'Telemetry Reset' });
+    toast({ title: 'Telemetry Reset', description: 'Speed and peak load cleared.' });
   };
 
-  const currentG = current.total / 9.81;
   const maxG = maxForceValue / 9.81;
 
-  // Gauge Visuals for G-Force (range 0 to 4.0G)
+  // Gauge Visuals (KM/H range 0 to 60)
   const radius = 90;
   const circumference = 2 * Math.PI * radius;
-  const maxVisualRange = 4.0; 
-  const percentage = Math.min(currentG / maxVisualRange, 1);
+  const maxVisualRange = 60.0; 
+  const percentage = Math.min(speedKmh / maxVisualRange, 1);
   const strokeDashoffset = circumference - (percentage * circumference * 0.75); 
 
   if (!isMounted) return null;
@@ -133,7 +164,7 @@ export default function AccelerometerPage() {
             V2V Telemetry
           </h1>
           <p className="text-muted-foreground text-[10px] font-black uppercase tracking-widest opacity-60">
-            {isCrashed ? "CRITICAL IMPACT DETECTED" : "Real-time G-Force Dynamics"}
+            {isCrashed ? "CRITICAL IMPACT DETECTED" : "Real-time Vehicle Dynamics"}
           </p>
         </div>
         <div className="flex items-center gap-3 w-full md:w-auto">
@@ -192,9 +223,9 @@ export default function AccelerometerPage() {
             <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
               <div className="space-y-0 -mt-4">
                 <span className={cn("text-6xl md:text-7xl font-black tracking-tighter tabular-nums leading-none block", isCrashed && "text-destructive")}>
-                  {currentG.toFixed(2)}
+                  {speedKmh.toFixed(1)}
                 </span>
-                <span className="text-lg font-black text-primary italic uppercase tracking-tighter">G-Force</span>
+                <span className="text-lg font-black text-primary italic uppercase tracking-tighter">KM/H</span>
               </div>
             </div>
 
@@ -213,9 +244,9 @@ export default function AccelerometerPage() {
                  <p className="text-sm font-black italic">{maxG.toFixed(2)}G</p>
                </div>
                <div className="text-center">
-                 <p className="text-[9px] font-black text-muted-foreground uppercase tracking-widest">Status</p>
+                 <p className="text-[9px] font-black text-muted-foreground uppercase tracking-widest">System</p>
                  <p className={cn("text-sm font-black italic", isCrashed ? "text-destructive" : "text-accent")}>
-                    {isCrashed ? "Impact" : "Normal"}
+                    {isCrashed ? "Impact" : "Stable"}
                  </p>
                </div>
              </div>
@@ -228,7 +259,7 @@ export default function AccelerometerPage() {
           { label: "Longitudinal (m/s²)", val: current.x, color: "text-primary", icon: MoveHorizontal },
           { label: "Lateral (m/s²)", val: current.y, color: "text-accent", icon: ArrowRightLeft },
           { label: "Vertical (m/s²)", val: current.z, color: "text-chart-1", icon: MoveVertical },
-          { label: "Resultant (m/s²)", val: current.total, color: "text-foreground", icon: Activity }
+          { label: "Current G-Force", val: current.total / 9.81, color: "text-foreground", icon: Activity }
         ].map((stat, i) => (
           <Card key={i} className="bg-card border-border/40 overflow-hidden shadow-sm">
             <CardHeader className="pb-1 pt-4 px-4">
