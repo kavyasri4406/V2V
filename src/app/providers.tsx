@@ -25,6 +25,15 @@ export function AppProviders({
   useEffect(() => {
     setMounted(true);
     
+    // PWA Service Worker Registration
+    if ('serviceWorker' in navigator && window.location.protocol === 'https:') {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/sw.js').catch(err => {
+          console.error('Service Worker registration failed:', err);
+        });
+      });
+    }
+
     // Apply theme on initial load
     const savedTheme = localStorage.getItem('theme');
     if (savedTheme === 'dark') {
@@ -33,7 +42,6 @@ export function AppProviders({
       document.documentElement.classList.remove('dark');
     }
     
-    // Faster, smoother transition from splash to app
     const fadeTimer = setTimeout(() => {
       setIsFadingOut(true);
     }, 500);

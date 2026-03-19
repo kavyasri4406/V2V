@@ -3,8 +3,8 @@ import { ImageResponse } from 'next/og'
 export const runtime = 'edge'
  
 export const size = {
-  width: 32,
-  height: 32,
+  width: 512,
+  height: 512,
 }
 export const contentType = 'image/png'
  
@@ -18,13 +18,14 @@ export default function Icon() {
           justifyContent: 'center',
           width: '100%',
           height: '100%',
-          borderRadius: '8px',
+          borderRadius: '128px',
           background: 'black',
           color: 'hsl(350, 85%, 70%)',
-          fontSize: '14px',
+          fontSize: '180px',
           fontFamily: 'sans-serif',
           fontWeight: 'bold',
-          padding: '2px',
+          padding: '40px',
+          border: '24px solid hsl(350, 85%, 70%)'
         }}
       >
         V2V
