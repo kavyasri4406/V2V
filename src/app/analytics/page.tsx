@@ -3,7 +3,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Progress } from '@/components/ui/progress';
 import { 
   TrendingUp, 
   AlertTriangle, 
@@ -11,11 +10,13 @@ import {
   ShieldCheck, 
   Activity, 
   History,
-  Info
+  Info,
+  RefreshCcw
 } from 'lucide-react';
 import { useFirebase } from '@/firebase';
 import { ref, onValue, off } from 'firebase/database';
 import { cn } from '@/lib/utils';
+import { useToast } from '@/hooks/use-toast';
 
 type EventLog = {
   type: 'Braking' | 'Acceleration' | 'Cornering' | 'Pothole';
@@ -36,7 +37,23 @@ export default function AnalyticsPage() {
   });
 
   const { database } = useFirebase();
+  const { toast } = useToast();
   const lastEventTime = useRef<number>(0);
+
+  const handleReset = () => {
+    setScore(100);
+    setEvents([]);
+    setStats({
+      harshBraking: 0,
+      rapidAccel: 0,
+      potholes: 0,
+      peakG: 0
+    });
+    toast({
+      title: "Insights Reset",
+      description: "Safety score and event logs have been cleared.",
+    });
+  };
 
   useEffect(() => {
     if (!active || !database) return;
@@ -113,13 +130,22 @@ export default function AnalyticsPage() {
             Behavioral analysis & safety metrics
           </p>
         </div>
-        <Button 
-          variant={active ? "destructive" : "default"} 
-          onClick={() => setActive(!active)}
-          className="font-black uppercase tracking-widest px-8"
-        >
-          {active ? "Stop Analysis" : "Start Analysis"}
-        </Button>
+        <div className="flex gap-3">
+          <Button 
+            variant="outline" 
+            onClick={handleReset}
+            className="font-bold uppercase tracking-widest"
+          >
+            <RefreshCcw className="mr-2 h-4 w-4" /> Reset
+          </Button>
+          <Button 
+            variant={active ? "destructive" : "default"} 
+            onClick={() => setActive(!active)}
+            className="font-black uppercase tracking-widest px-8"
+          >
+            {active ? "Stop Analysis" : "Start Analysis"}
+          </Button>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
