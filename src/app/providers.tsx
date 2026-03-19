@@ -33,14 +33,14 @@ export function AppProviders({
       document.documentElement.classList.remove('dark');
     }
     
-    // Controlled delay to ensure safe hydration before fading splash
+    // Faster, smoother transition from splash to app
     const fadeTimer = setTimeout(() => {
       setIsFadingOut(true);
-    }, 400);
+    }, 500);
 
     const loadTimer = setTimeout(() => {
       setIsLoading(false);
-    }, 600);
+    }, 800);
 
     return () => {
       clearTimeout(fadeTimer);
@@ -48,7 +48,6 @@ export function AppProviders({
     };
   }, []);
 
-  // Hydration safety: Return a placeholder that exactly matches server SSR until mounted
   if (!mounted) {
     return (
       <div className="fixed inset-0 z-[100] bg-black">
@@ -57,30 +56,26 @@ export function AppProviders({
     );
   }
 
-  const splashContainerClasses = cn(
-    "fixed inset-0 z-[100] transition-opacity duration-500 ease-in-out bg-black",
-    isFadingOut ? "opacity-0 pointer-events-none" : "opacity-100"
-  );
-
-  const contentContainerClasses = cn(
-    "transition-all duration-500",
-    isLoading ? 'opacity-0 scale-[0.98] blur-md' : 'opacity-100 scale-100 blur-0'
-  );
-
   return (
     <>
         {isLoading && (
-          <div className={splashContainerClasses}>
+          <div className={cn(
+            "fixed inset-0 z-[100] transition-opacity duration-500 ease-in-out bg-black",
+            isFadingOut ? "opacity-0 pointer-events-none" : "opacity-100"
+          )}>
             <SplashScreen />
           </div>
         )}
-        <div className={contentContainerClasses}>
+        <div className={cn(
+          "transition-all duration-700 ease-out",
+          isLoading ? 'opacity-0 scale-95 blur-sm' : 'opacity-100 scale-100 blur-0'
+        )}>
           <FirebaseClientProvider>
               {isAuthPage ? (
               <AuthLayout>{children}</AuthLayout>
               ) : (
               <MainLayout>
-                  <div className="animate-in fade-in slide-in-from-bottom-1 duration-300 ease-out fill-mode-forwards">
+                  <div className="animate-in fade-in slide-in-from-bottom-2 duration-500 ease-out fill-mode-forwards">
                     {children}
                   </div>
               </MainLayout>
